@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MotionScene
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    motion:defaultDuration="150"
+    xmlns:motion="http://schemas.android.com/apk/res-auto">
+<!--    <StateSet motion:defaultState="@id/end"/>-->
+    <Transition
+        motion:constraintSetEnd="@+id/middle"
+        motion:constraintSetStart="@id/start"
+        motion:duration="150">
+
+        <OnSwipe motion:dragDirection="dragUp" motion:touchAnchorSide="top"
+            motion:touchAnchorId="@id/box_info" />
+    </Transition>
+    <Transition
+        motion:constraintSetStart="@+id/middle"
+        motion:constraintSetEnd="@+id/circle_image"
+        motion:autoTransition="animateToEnd"
+        motion:duration="150" >
+        <OnSwipe motion:dragDirection="dragUp" motion:touchAnchorSide="top" />
+    </Transition>
+    <Transition
+        motion:constraintSetStart="@+id/circle_image"
+        motion:duration="150"
+        motion:constraintSetEnd="@+id/middle" >
+        <OnSwipe
+            motion:dragDirection="dragDown"
+            motion:touchAnchorSide="bottom" />
+    </Transition>
+    <Transition
+        motion:constraintSetStart="@+id/middle"
+        motion:constraintSetEnd="@+id/start"
+        motion:duration="150"
+        motion:autoTransition="animateToEnd" />
+
+    <ConstraintSet android:id="@+id/start">
+        <Constraint
+            android:id="@+id/name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            motion:layout_constraintBottom_toTopOf="@id/id_text"
+            android:layout_marginStart="12dp"
+            motion:layout_constraintStart_toStartOf="parent" >
+            <CustomAttribute
+                motion:attributeName="textSize"
+                motion:customDimension="12sp" />
+        </Constraint>
+        <Constraint
+            android:id="@+id/box_image"
+            motion:layout_constraintEnd_toEndOf="parent"
+            android:layout_width="0dp"
+            android:layout_height="340dp"
+            motion:layout_constraintTop_toTopOf="parent"
+            motion:layout_constraintStart_toStartOf="parent" >
+            <CustomAttribute
+                motion:attributeName="radius"
+                motion:customDimension="0dp" />
+        </Constraint>
+    </ConstraintSet>
+
+    <ConstraintSet android:id="@+id/middle">
+        <Constraint
+            android:id="@+id/box_image"
+            motion:layout_constraintEnd_toEndOf="parent"
+            android:layout_width="0dp"
+            android:layout_height="250dp"
+            motion:layout_constraintTop_toTopOf="parent"
+            motion:layout_constraintStart_toStartOf="parent" >
+            <CustomAttribute
+                motion:attributeName="app:cardCornerRadius" />
+            <CustomAttribute
+                motion:attributeName="radius"
+                motion:customDimension="0dp" />
+        </Constraint>
+        <Constraint
+            android:id="@+id/name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            motion:layout_constraintBottom_toTopOf="@id/id_text"
+            android:layout_marginStart="12dp"
+            motion:layout_constraintStart_toStartOf="parent" >
+            <CustomAttribute
+                motion:attributeName="textSize"
+                motion:customDimension="10sp" />
+        </Constraint>
+        <Constraint
+            android:id="@+id/surface"
+            motion:layout_constraintEnd_toEndOf="parent"
+            android:layout_width="match_parent"
+            android:layout_height="250dp"
+            motion:layout_constraintTop_toTopOf="parent"
+            motion:layout_constraintStart_toStartOf="parent" />
+        <Constraint
+            android:id="@+id/surface"
+            motion:layout_constraintEnd_toEndOf="parent"
+            android:layout_width="match_parent"
+            android:layout_height="250dp"
+            motion:layout_constraintTop_toTopOf="parent"
+            motion:layout_constraintStart_toStartOf="parent" />
+        <Constraint
+            android:id="@+id/id_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            motion:layout_constraintBottom_toBottomOf="@id/box_image"
+            android:layout_marginBottom="12dp"
+            motion:layout_constraintStart_toStartOf="@id/name" />
+    </ConstraintSet>
+    <ConstraintSet
+        android:id="@+id/circle_image"
+        motion:deriveConstraintsFrom="@+id/middle" >
+        <Constraint
+            android:id="@+id/surface"
+            motion:layout_constraintEnd_toEndOf="parent"
+            android:layout_width="match_parent"
+            android:layout_height="160dp"
+            motion:layout_constraintTop_toTopOf="parent"
+            motion:layout_constraintStart_toStartOf="parent" />
+        <Constraint
+            android:id="@+id/box_image"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintBottom_toBottomOf="@+id/surface"
+            motion:layout_constraintTop_toBottomOf="@+id/back"
+            android:layout_marginStart="12dp">
+            <CustomAttribute
+                motion:attributeName="radius"
+                motion:customDimension="76dp" />
+        </Constraint>
+        <Constraint
+            android:id="@+id/name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            motion:layout_constraintBottom_toTopOf="@id/id_text"
+            motion:layout_constraintStart_toEndOf="@+id/box_image"
+            motion:layout_constraintTop_toTopOf="@+id/box_image">
+            <CustomAttribute
+                motion:attributeName="textSize"
+                motion:customDimension="8sp" />
+        </Constraint>
+        <Constraint
+            android:id="@+id/floating_action_button"
+            motion:layout_constraintEnd_toEndOf="parent"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            motion:layout_constraintBottom_toBottomOf="@+id/surface"
+            motion:layout_constraintTop_toBottomOf="@id/box_image"
+            android:layout_marginEnd="12dp" />
+        <Constraint
+            android:id="@+id/id_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            motion:layout_constraintBottom_toBottomOf="@id/box_image"
+            android:layout_marginBottom="8dp"
+            motion:layout_constraintStart_toStartOf="@id/name" />
+    </ConstraintSet>
+    <ConstraintSet
+        android:id="@+id/end"
+        motion:deriveConstraintsFrom="@+id/circle_image" >
+        <Constraint
+            android:id="@+id/floating_action_button"
+            motion:layout_constraintEnd_toEndOf="parent"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            motion:layout_constraintBottom_toBottomOf="@+id/surface"
+            motion:layout_constraintTop_toBottomOf="@id/box_image"
+            android:layout_marginEnd="12dp"
+            android:visibility="gone" />
+        <Constraint
+            android:layout_height="40dp"
+            motion:layout_constraintBottom_toBottomOf="@+id/back"
+            android:layout_width="40dp"
+            motion:layout_constraintStart_toEndOf="@+id/back"
+            android:id="@+id/box_image"
+            android:layout_marginStart="12dp"
+            motion:layout_constraintTop_toTopOf="@+id/back" />
+
+        <Constraint
+            android:id="@+id/name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            motion:layout_constraintBottom_toTopOf="@id/id_text"
+            motion:layout_constraintStart_toEndOf="@+id/box_image"
+            motion:layout_constraintTop_toTopOf="@+id/box_image" >
+            <CustomAttribute
+                motion:attributeName="textSize"
+                motion:customDimension="8sp" />
+        </Constraint>
+        <Constraint
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            motion:layout_constraintBottom_toBottomOf="@id/box_image"
+            android:layout_marginBottom="0dp"
+            motion:layout_constraintStart_toStartOf="@id/name"
+            android:id="@+id/id_text" />
+        <Constraint
+            android:id="@+id/surface"
+            motion:layout_constraintEnd_toEndOf="parent"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            motion:layout_constraintTop_toTopOf="parent"
+            motion:layout_constraintStart_toStartOf="parent" />
+    </ConstraintSet>
+    <Transition
+        motion:constraintSetStart="@+id/circle_image"
+        motion:constraintSetEnd="@+id/end" >
+        <OnSwipe />
+    </Transition>
+    <Transition
+        motion:constraintSetStart="@+id/end"
+        motion:constraintSetEnd="@+id/circle_image"
+        motion:duration="200">
+        <OnSwipe
+            motion:dragDirection="dragDown"
+            motion:touchAnchorSide="bottom" />
+    </Transition>
+</MotionScene>
