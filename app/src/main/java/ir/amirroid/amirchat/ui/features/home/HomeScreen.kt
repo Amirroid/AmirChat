@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Menu
@@ -46,12 +47,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -60,7 +63,7 @@ import ir.amirroid.amirchat.ui.components.ChatPopUp
 import ir.amirroid.amirchat.ui.components.UserListItem
 import ir.amirroid.amirchat.utils.ChatPages
 import ir.amirroid.amirchat.utils.SimpleList
-import ir.amirroid.amirchat.viewmodels.ChatViewModel
+import ir.amirroid.amirchat.viewmodels.home.HomeViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -69,9 +72,14 @@ import kotlin.math.abs
 fun HomeScreen(
     navigation: NavController
 ) {
+    val viewModel: HomeViewModel = hiltViewModel()
     val statusBarColor = MaterialTheme.colorScheme.surfaceColorAtElevation(
         1.dp
     )
+    val profileImage by viewModel.image.collectAsStateWithLifecycle(initialValue = "")
+    val phoneNumber by viewModel.mobile.collectAsStateWithLifecycle(initialValue = "")
+    val firstName by viewModel.firstName.collectAsStateWithLifecycle(initialValue = "")
+    val lastName by viewModel.lastName.collectAsStateWithLifecycle(initialValue = "")
     val profiles = SimpleList.listProfiles
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -93,7 +101,10 @@ fun HomeScreen(
         drawerContent = {
             DrawerContent(
                 widthDpDrawer,
-                context
+                context,
+                profileImage,
+                phoneNumber,
+                "$firstName $lastName"
             )
         },
         drawerState = drawerState,
@@ -163,7 +174,10 @@ fun HomeScreen(
 @Composable
 fun DrawerContent(
     widthDpDrawer: Dp,
-    context: Context
+    context: Context,
+    image: String,
+    phoneNumber: String,
+    name: String
 ) {
     Surface(
         modifier = Modifier
@@ -181,23 +195,24 @@ fun DrawerContent(
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data("https://www.alamto.com/wp-content/uploads/2023/05/flower-9.jpg")
+                        .data(image)
                         .crossfade(true)
                         .crossfade(500)
                         .build(),
                     contentDescription = "profile",
                     modifier = Modifier
                         .size(76.dp)
-                        .clip(CircleShape)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
                 )
                 Text(
-                    text = "Amirreza Gholami",
+                    text = name,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 8.dp),
                     maxLines = 1
                 )
                 Text(
-                    text = "09150211935",
+                    text = phoneNumber,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier
                         .padding(top = 6.dp)

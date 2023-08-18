@@ -1,7 +1,6 @@
 package ir.amirroid.amirchat.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,12 +23,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun OtpView(
     code: String,
     length: Int,
+    correct: Boolean,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -41,7 +41,7 @@ fun OtpView(
         for (i in 0 until length) {
             val text = code.getOrNull(i) ?: ""
             val enabled = code.length == i
-            Otp(text = text.toString(), enabled = enabled)
+            Otp(text = text.toString(), enabled = enabled, correct)
         }
     }
 }
@@ -49,10 +49,15 @@ fun OtpView(
 @Composable
 fun Otp(
     text: String,
-    enabled: Boolean
+    enabled: Boolean,
+    correct: Boolean
 ) {
     val color by animateColorAsState(
-        targetValue = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
+        targetValue = when {
+            correct -> Color.Green
+            enabled -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        },
         label = "",
         animationSpec = tween(300)
     )

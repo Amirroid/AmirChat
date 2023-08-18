@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     kotlin("kapt")
     id("com.google.dagger.hilt.android")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -119,12 +120,19 @@ dependencies {
     // zxing
     implementation("com.journeyapps:zxing-android-embedded:4.1.0")
 
-    // backendless
-    implementation("com.backendless:backendless:6.3.6")
-
     // melli payamak
     implementation("com.google.code.ksoap2-android:ksoap2-android:3.6.1")
 
     // data store
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+    // auth
+    implementation("com.google.android.gms:play-services-auth:20.6.0")
+    implementation("com.google.android.gms:play-services-auth-api-phone:18.0.1")
+
+
+    // firebase
+    implementation("com.google.firebase:firebase-database-ktx:20.2.2")
+    implementation("com.google.firebase:firebase-storage-ktx:20.2.1")
+    implementation("com.google.firebase:firebase-firestore-ktx:24.7.0")
 }

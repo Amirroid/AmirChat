@@ -28,6 +28,8 @@ import com.google.accompanist.navigation.animation.composable
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
 import dagger.hilt.android.AndroidEntryPoint
 import ir.amirroid.amirchat.data.auth.AuthManager
+import ir.amirroid.amirchat.data.helpers.TokenHelper
+import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.ui.features.chat.ChatScreen
 import ir.amirroid.amirchat.ui.features.home.HomeScreen
 import ir.amirroid.amirchat.ui.features.profile.ProfileScreen
@@ -41,7 +43,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject
-    lateinit var authManager: AuthManager
+    lateinit var tokenHelper: TokenHelper
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -57,7 +59,7 @@ class MainActivity : ComponentActivity() {
                             .imePadding()
                             .background(MaterialTheme.colorScheme.background)
                     ) {
-                        MainScreen(true)
+                        MainScreen(CurrentUser.token?.isNotEmpty() == true)
                     }
                 }
             }

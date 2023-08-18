@@ -1,26 +1,18 @@
 package ir.amirroid.amirchat.data.models.register
 
 object CurrentUser {
-    var firstName: String? = null
-        private set
-    var lastName: String? = null
-        private set
     var token: String? = null
         private set
-
-    fun setFirstName(
-        firstName: String,
-    ) {
-        this.firstName = firstName
-    }
-    fun setLastName(
-        lastName: String,
-    ) {
-        this.lastName = lastName
-    }
+    var mobile: String? = null
+        private set
     fun setToken(
         token: String,
     ) {
         this.token = token
+    }
+    fun setMobile(
+        mobile: String,
+    ) {
+        this.mobile = mobile
     }
 }

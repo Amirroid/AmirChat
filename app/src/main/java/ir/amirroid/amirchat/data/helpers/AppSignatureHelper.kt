@@ -3,7 +3,6 @@ package ir.amirroid.amirchat.data.helpers
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.PackageManager
-import android.content.pm.Signature
 import android.util.Base64
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.nio.charset.StandardCharsets
@@ -24,7 +23,7 @@ class AppSignatureHelper @Inject constructor(
                 PackageManager.GET_SIGNATURES
             )
             for (signature in packageInfo.signatures) {
-                val hashCode = getHashCode(signature)
+                val hashCode = getHashCode(signature.toCharsString())
                 if (hashCode != null) {
                     appCodes += String.format("%s", hashCode)
                 }
@@ -35,8 +34,8 @@ class AppSignatureHelper @Inject constructor(
         return appCodes
     }
 
-    private fun getHashCode(signature: Signature): String? {
-        val appInfo = context.packageName + " " + signature.toString()
+    private fun getHashCode(signature: String): String? {
+        val appInfo = context.packageName + " " + signature
         try {
             val messageDigest = MessageDigest.getInstance("SHA-256")
             messageDigest.update(

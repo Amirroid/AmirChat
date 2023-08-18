@@ -13,8 +13,10 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.models.chat.ChatRoom
 import ir.amirroid.amirchat.data.models.media.FileModel
 import ir.amirroid.amirchat.data.models.media.MediaModel
+import ir.amirroid.amirchat.data.models.register.UserModel
 import java.net.URLConnection
 import java.text.SimpleDateFormat
 
@@ -148,3 +150,8 @@ fun Size.toDpSize(density: Density) = DpSize(
     with(density) { width.toDp() },
     with(density) { height.toDp() },
 )
+
+
+fun UserModel.getName() = "$firstName $lastName"
+
+fun ChatRoom.generateChild() = "${from}-$to"

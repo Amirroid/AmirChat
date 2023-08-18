@@ -6,11 +6,10 @@ import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.models.media.SendDataType
 
 object Constants {
+
     // back end
-    const val BACK_END_APPLICATION_API_KEY = "2DE331E8-AE2F-46D7-8540-F29B6E80B7A1"
-    const val BACK_END_APPLICATION_ID = "9B1E7FCF-E19D-C483-FFDA-121C70B00E00"
-    const val USER_NAME = "09155415832"
-    const val PASSWORD = "2m47a"
+    const val BASE_UIL_FIREBASE_STORAGE = "https://firebasestorage.googleapis.com"
+    const val API_KEY = "7c6c54d003bd422058d2c93dbd7140e2454c495f6f6a2699f24b927c12b0f1e3"
 
 
     // pages
@@ -26,6 +25,14 @@ object Constants {
     const val FIRST_NAME = "firstName"
     const val LAST_NAME = "lastName"
     const val TOKEN = "token"
+    const val IMAGE = "image"
+    const val MOBILE = "mobile"
+
+
+    // references
+    const val USERS = "Users"
+    const val ROOMS = "Rooms"
+    const val CHATS = "Chats"
 
 
     val listMessageEmoji = listOf(

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "3149813435",
+    "project_id": "amir-chat-394722",
+    "storage_bucket": "amir-chat-394722.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:3149813435:android:da0aa926946be760fe7b9e",
+        "android_client_info": {
+          "package_name": "ir.amirroid.amirchat"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "3149813435-mckmrd0qrg3amuh1q6ce8qbl8gfo35g0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBYuTHFMyB3yhQFCiw2McDmSW_oRbkIzr0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "3149813435-mckmrd0qrg3amuh1q6ce8qbl8gfo35g0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

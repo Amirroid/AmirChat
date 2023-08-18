@@ -1,16 +1,25 @@
 package ir.amirroid.amirchat.ui.features.search
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material3.Badge
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -21,28 +30,42 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.ui.components.UserListItem
 import ir.amirroid.amirchat.utils.getBasicColorsOfTextField
+import ir.amirroid.amirchat.utils.getName
+import ir.amirroid.amirchat.viewmodels.search.SearchViewModel
 
 @Composable
 fun SearchScreen(
     navigation: NavController
 ) {
-    var searchText by remember {
-        mutableStateOf("")
-    }
+    val viewModel: SearchViewModel = hiltViewModel()
+    val loading = viewModel.loading
+    val searchText = viewModel.text
+    val users by viewModel.users.collectAsStateWithLifecycle()
     val focusRequester = remember {
         FocusRequester()
     }
-    DisposableEffect(key1 = Unit){
+    val context = LocalContext.current
+    DisposableEffect(key1 = Unit) {
         focusRequester.requestFocus()
-        onDispose {  }
+        onDispose { }
     }
     Column(
         modifier = Modifier
@@ -56,7 +79,7 @@ fun SearchScreen(
 
             TextField(
                 value = searchText,
-                onValueChange = { searchText = it },
+                onValueChange = { viewModel.text = it; viewModel.search() },
                 colors = getBasicColorsOfTextField(),
                 placeholder = {
                     Text(text = stringResource(id = R.string.search))
@@ -68,8 +91,46 @@ fun SearchScreen(
                         Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = "back")
                     }
                 },
-                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
             )
+        }
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            if (loading) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillParentMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(strokeCap = StrokeCap.Round)
+                    }
+                }
+            }
+            items(users.size, key = { users[it].mobileNumber }) {
+                val user = users[it]
+                ListItem(
+                    headlineContent = { Text(text = user.getName()) },
+                    leadingContent = {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(user.profilePictureUrl)
+                                .crossfade(true)
+                                .crossfade(300).build(),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(CircleShape)
+                        )
+                    },
+                    supportingContent = {
+                        Text(text = user.userId)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { },
+                )
+            }
         }
     }
 }
