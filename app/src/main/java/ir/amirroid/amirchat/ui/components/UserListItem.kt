@@ -39,23 +39,30 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import ir.amirroid.amirchat.data.models.chat.ChatRoom
+import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.utils.Profile
+import ir.amirroid.amirchat.utils.getName
 import ir.amirroid.amirchat.utils.toDp
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun UserListItem(
-    profile: Profile,
+    room: ChatRoom,
     context: Context = LocalContext.current,
     density: Density,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
+    val user = if (room.from.token == CurrentUser.token) {
+        room.to
+    } else room.from
     val dismissState = rememberDismissState(positionalThreshold = {
         it * .5f
     })
@@ -112,18 +119,19 @@ fun UserListItem(
             label = "",
             animationSpec = tween(500, easing = EaseInOut)
         )
-        ListItem(headlineContent = { Text(text = profile.name) }, leadingContent = {
+        ListItem(headlineContent = { Text(text = user.getName()) }, leadingContent = {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(profile.image).crossfade(true)
+                model = ImageRequest.Builder(context).data(user.profilePictureUrl).crossfade(true)
                     .crossfade(300).build(),
                 contentDescription = null,
                 modifier = Modifier
                     .size(50.dp)
-                    .clip(CircleShape)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
             )
         },
             supportingContent = {
-                Text(text = profile.desc)
+                Text(text = user.bio)
             }, modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomEnd = radius, topEnd = radius))

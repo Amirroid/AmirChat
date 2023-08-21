@@ -43,6 +43,8 @@ fun Long.formatTime(): String {
     return "${m}:$s"
 }
 
+fun Long.formatTimeHourMinute() = SimpleDateFormat("HH:mm").format(this) ?: ""
+
 @SuppressLint("SimpleDateFormat")
 fun Long.formatDateTime() =
     SimpleDateFormat("yyyy/MM/dd - HH:ss").format(this) ?: System.currentTimeMillis().toString()
@@ -154,4 +156,5 @@ fun Size.toDpSize(density: Density) = DpSize(
 
 fun UserModel.getName() = "$firstName $lastName"
 
-fun ChatRoom.generateChild() = "${from}-$to"
+val ChatRoom.id: String
+    get() = "${this.from.token}-${this.to.token}"

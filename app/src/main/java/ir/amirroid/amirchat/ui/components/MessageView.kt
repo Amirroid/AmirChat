@@ -1,6 +1,9 @@
 package ir.amirroid.amirchat.ui.components
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.scaleIn
@@ -16,11 +19,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -46,6 +54,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
@@ -56,29 +65,37 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
+import androidx.core.net.toFile
+import androidx.core.net.toUri
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.models.chat.FileMessage
+import ir.amirroid.amirchat.data.models.chat.MessageModel
+import ir.amirroid.amirchat.data.models.register.CurrentUser
+import ir.amirroid.amirchat.utils.Constants
+import ir.amirroid.amirchat.utils.formatTimeHourMinute
 import ir.amirroid.amirchat.utils.getColorOfMessage
 import ir.amirroid.amirchat.utils.getShapeOfMessage
 import ir.amirroid.amirchat.utils.getTextColorOfMessage
 import ir.amirroid.amirchat.utils.toDp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.io.File
 
 @Composable
 fun MessageView(
     maxWidth: Dp,
-    text: String,
+    message: MessageModel,
     isMyUser: Boolean,
     replyEnabled: Boolean = true,
     onClick: (Offset) -> Unit,
     onLongClick: () -> Unit,
-    onContentClick: ((Offset, Size) -> Unit)? = null
+    onContentClick: ((Offset, Size, Pair<MessageModel, FileMessage>) -> Unit)? = null
 ) {
     SwipeBox(paddingEnd = if (isMyUser) 0.dp else 12.dp, enabled = replyEnabled) {
         MessageView(
-            text = text,
+            message = message,
             maxWidth = maxWidth,
             isMyUser,
             onClick,
@@ -91,12 +108,12 @@ fun MessageView(
 
 @Composable
 fun RowScope.MessageView(
-    text: String,
+    message: MessageModel,
     maxWidth: Dp,
     isMyUser: Boolean,
     onClick: (Offset) -> Unit,
     onLongClick: () -> Unit,
-    onContentClick: ((Offset, Size) -> Unit)? = null
+    onContentClick: ((Offset, Size, Pair<MessageModel, FileMessage>) -> Unit)? = null
 ) {
     var position by remember {
         mutableStateOf(Offset.Zero)
@@ -125,58 +142,199 @@ fun RowScope.MessageView(
                     position = it.positionInWindow()
                 }
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(2.dp)
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 18.dp,
-                            topEnd = 18.dp,
-                            bottomEnd = 4.dp,
-                            bottomStart = 4.dp
-                        )
-                    )
-            ) {
-                var size by remember {
-                    mutableStateOf(Size.Zero)
+            if (message.files.isNotEmpty()) {
+                FilesContent(message) { offset, size, file ->
+                    onContentClick?.invoke(offset, size, Pair(message, file))
                 }
-                var offset by remember {
-                    mutableStateOf(Offset.Zero)
-                }
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data("https://www.alamto.com/wp-content/uploads/2023/05/flower-9.jpg")
-                        .crossfade(true).crossfade(200).build(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .clickable { onContentClick?.invoke(offset, size) }
-                        .onGloballyPositioned {
-                            size = it.size.toSize()
-                            offset = it.positionInWindow()
-                        }
-                )
             }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                SelectionContainer {
+                if (message.message.isNotEmpty()) {
+                    SelectionContainer {
+                        Text(
+                            text = message.message,
+                            modifier = Modifier,
+                            color = getTextColorOfMessage(isMyUser = isMyUser)
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(top = 8.dp)
+                        .alpha(0.7f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = text,
-                        modifier = Modifier,
-                        color = getTextColorOfMessage(isMyUser = isMyUser)
+                        text = message.date.formatTimeHourMinute(),
+                        style = MaterialTheme.typography.labelMedium.copy(MaterialTheme.colorScheme.onSurface)
+                    )
+                    val icon = when (message.status) {
+                        Constants.SENDING -> R.drawable.outline_watch_later_24
+                        Constants.SEND -> R.drawable.baseline_done_24
+                        Constants.SEEN -> R.drawable.baseline_done_all_24
+                        else -> R.drawable.outline_watch_later_24
+                    }
+                    Icon(
+                        painter = painterResource(id = icon),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .size(18.dp)
                     )
                 }
-                Text(
-                    text = "23:22",
-                    modifier = Modifier
-                        .padding(top = 8.dp)
-                        .align(Alignment.End)
-                        .alpha(0.7f),
-                    style = MaterialTheme.typography.labelMedium.copy(MaterialTheme.colorScheme.onSurface)
-                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FilesContent(files: MessageModel, onContentClick: ((Offset, Size, FileMessage) -> Unit)?) {
+    when (files.files.first().type) {
+        Constants.GALLERY -> {
+            GalleryView(files, onContentClick)
+        }
+    }
+}
+
+@Composable
+fun GalleryView(message: MessageModel, onContentClick: ((Offset, Size, FileMessage) -> Unit)?) {
+    val files = message.files
+    val context = LocalContext.current
+    Box(
+        modifier = Modifier
+            .padding(4.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .fillMaxWidth()
+    ) {
+        if (files.size == 1) {
+            var bitmap by remember {
+                mutableStateOf<Bitmap?>(null)
+            }
+            var offset by remember {
+                mutableStateOf(Offset.Zero)
+            }
+            var size by remember {
+                mutableStateOf(Size.Zero)
+            }
+            LaunchedEffect(key1 = Unit) {
+                if (message.from == CurrentUser.token) {
+                    bitmap = BitmapFactory.decodeFile(files.first().fromPath)
+                    ImageRequest.Builder(context).data(files.first().path)
+                        .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
+                } else {
+                    ImageRequest.Builder(context).data(files.first().path)
+                        .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
+                }
+            }
+            AsyncImage(
+                model = bitmap,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clickable(enabled = onContentClick != null) {
+                        onContentClick?.invoke(offset, size, files.first())
+                    }
+                    .onGloballyPositioned {
+                        offset = it.positionInWindow()
+                        size = it.size.toSize()
+                    },
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Column {
+                for (i in (0..files.size.plus(1).div(2).minus(1))) {
+                    val index = i * 2
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        var offset by remember {
+                            mutableStateOf(Offset.Zero)
+                        }
+                        var size by remember {
+                            mutableStateOf(Size.Zero)
+                        }
+                        var bitmap by remember {
+                            mutableStateOf<Bitmap?>(null)
+                        }
+                        var bitmap2 by remember {
+                            mutableStateOf<Bitmap?>(null)
+                        }
+                        LaunchedEffect(key1 = Unit) {
+                            if (message.from == CurrentUser.token) {
+                                bitmap = BitmapFactory.decodeFile(files[index].fromPath)
+                                ImageRequest.Builder(context).data(files[index].path)
+                                    .target { b -> bitmap = (b as BitmapDrawable).bitmap }
+                                    .build()
+                                if (files.size.minus(1) >= index.plus(1)) {
+                                    bitmap2 = BitmapFactory.decodeFile(files[index.plus(1)].fromPath)
+                                    ImageRequest.Builder(context)
+                                        .data(files[index.plus(1)].path)
+                                        .target { b ->
+                                            bitmap2 = (b as BitmapDrawable).bitmap
+                                        }
+                                        .build()
+                                }
+                            } else {
+                                ImageRequest.Builder(context).data(files[index].path)
+                                    .target { b -> bitmap = (b as BitmapDrawable).bitmap }
+                                    .build()
+                                if (files.size.minus(1) >= index.plus(1)) {
+                                    ImageRequest.Builder(context)
+                                        .data(files[index.plus(1)].path)
+                                        .target { b ->
+                                            bitmap2 = (b as BitmapDrawable).bitmap
+                                        }
+                                        .build()
+                                }
+                            }
+                        }
+                        AsyncImage(
+                            model = bitmap,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(max = 200.dp)
+                                .clickable(enabled = onContentClick != null) {
+                                    onContentClick?.invoke(offset, size, files[index])
+                                }
+                                .onGloballyPositioned {
+                                    offset = it.positionInWindow()
+                                    size = it.size.toSize()
+                                },
+                            contentScale = ContentScale.Crop
+                        )
+                        if (files.size.minus(1) >= index.plus(1)) {
+                            var offset2 by remember {
+                                mutableStateOf(Offset.Zero)
+                            }
+                            var size2 by remember {
+                                mutableStateOf(Size.Zero)
+                            }
+                            Spacer(modifier = Modifier.width(2.dp))
+                            AsyncImage(
+                                model = bitmap2,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(max = 200.dp)
+                                    .clickable(enabled = onContentClick != null) {
+                                        onContentClick?.invoke(offset2, size2, files[index.plus(1)])
+                                    }
+                                    .onGloballyPositioned {
+                                        offset2 = it.positionInWindow()
+                                        size2 = it.size.toSize()
+                                    },
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                    if (files.size >= index.plus(2)) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                    }
+                }
             }
         }
     }

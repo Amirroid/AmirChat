@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import ir.amirroid.amirchat.R
 import javax.sql.DataSource
 
 
@@ -124,3 +125,15 @@ fun getVideoFrames(size: Int, duration: Long, path: String, list: SnapshotStateL
 val Context.preferences: DataStore<Preferences> by preferencesDataStore(
     Constants.CATCH_NAME
 )
+
+
+fun getTypeForFile(type: String, context: Context): Int {
+    return when (type) {
+        context.getString(R.string.gallery) -> Constants.GALLERY
+        context.getString(R.string.location) -> Constants.LOCATION
+        context.getString(R.string.contacts) -> Constants.CONTACT
+        context.getString(R.string.music) -> Constants.MUSIC
+        context.getString(R.string.file) -> Constants.FILE
+        else -> Constants.FILE
+    }
+}

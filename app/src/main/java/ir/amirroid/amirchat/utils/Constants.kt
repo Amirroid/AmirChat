@@ -7,14 +7,27 @@ import ir.amirroid.amirchat.data.models.media.SendDataType
 
 object Constants {
 
+
     // back end
     const val BASE_UIL_FIREBASE_STORAGE = "https://firebasestorage.googleapis.com"
     const val API_KEY = "7c6c54d003bd422058d2c93dbd7140e2454c495f6f6a2699f24b927c12b0f1e3"
+
+    // types
+    const val SENDING = 0
+    const val SEND = 1
+    const val SEEN = 2
+
+    const val GALLERY = 1
+    const val FILE = 2
+    const val LOCATION = 3
+    const val CONTACT = 4
+    const val MUSIC = 5
 
 
     // pages
     const val REGISTER = "register"
     const val HOME = "home"
+    const val SPLASH = "splash"
     const val SEARCH = "search"
     const val CHAT = "chat"
     const val PROFILE = "profile"

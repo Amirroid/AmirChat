@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -45,8 +46,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.google.gson.Gson
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.ui.components.UserListItem
+import ir.amirroid.amirchat.utils.ChatPages
 import ir.amirroid.amirchat.utils.getBasicColorsOfTextField
 import ir.amirroid.amirchat.utils.getName
 import ir.amirroid.amirchat.viewmodels.search.SearchViewModel
@@ -120,7 +124,8 @@ fun SearchScreen(
                             contentDescription = null,
                             modifier = Modifier
                                 .size(50.dp)
-                                .clip(CircleShape)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
                         )
                     },
                     supportingContent = {
@@ -128,7 +133,9 @@ fun SearchScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { },
+                        .clickable {
+                            navigation.navigate(ChatPages.ChatScreen.route + "?user=" + Gson().toJson(user))
+                        },
                 )
             }
         }

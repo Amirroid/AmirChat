@@ -10,11 +10,19 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import ir.amirroid.amirchat.data.helpers.MusicHelper
 import ir.amirroid.amirchat.data.helpers.RecorderHelper
+import ir.amirroid.amirchat.data.models.chat.ChatRoom
+import ir.amirroid.amirchat.data.models.chat.FileMessage
+import ir.amirroid.amirchat.data.models.chat.MessageModel
 import ir.amirroid.amirchat.data.models.media.ContactModel
 import ir.amirroid.amirchat.data.models.media.FileModel
 import ir.amirroid.amirchat.data.models.media.MediaModel
 import ir.amirroid.amirchat.data.models.media.MusicModel
+import ir.amirroid.amirchat.data.models.register.CurrentUser
+import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.data.repositories.FileRepository
+import ir.amirroid.amirchat.data.repositories.chats.ChatRepository
+import ir.amirroid.amirchat.utils.Constants
+import ir.amirroid.amirchat.utils.id
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,8 +37,16 @@ class ChatViewModel @Inject constructor(
     @ApplicationContext val context: Context,
     private val fileRepository: FileRepository,
     private val musicHelper: MusicHelper,
-    private val recorderHelper: RecorderHelper
+    private val recorderHelper: RecorderHelper,
+    private val chatRepository: ChatRepository
 ) : ViewModel() {
+
+    private val _chats = MutableStateFlow<List<MessageModel>>(emptyList())
+    val chats = _chats.asStateFlow()
+
+
+    private val _room = MutableStateFlow<ChatRoom?>(null)
+
     private val _medias = MutableStateFlow<List<MediaModel>>(emptyList())
     val medias = _medias.asStateFlow()
 
@@ -69,6 +85,53 @@ class ChatViewModel @Inject constructor(
 
     init {
         observeToMusicStates()
+    }
+
+    fun observeToChats(
+        room: String?,
+        user: UserModel
+    ) {
+        if (room == null) {
+            chatRepository.addRoomWithUser(
+                user
+            ) { createdRoom ->
+                _room.value = createdRoom
+                chatRepository.observeToChat(createdRoom.id) {
+                    _chats.value = it
+                }
+            }
+        } else {
+            _room.value = if (room.split("-").first() == CurrentUser.token) {
+                ChatRoom(
+                    CurrentUser.user ?: UserModel(),
+                    user
+                )
+            } else {
+                ChatRoom(
+                    user,
+                    CurrentUser.user ?: UserModel()
+                )
+            }
+            chatRepository.observeToChat(room) {
+                _chats.value = it
+            }
+        }
+    }
+
+    fun addMessage(text: String, files: List<FileMessage> = emptyList()) {
+        chatRepository.addMessage(
+            MessageModel(
+                message = text,
+                from = CurrentUser.token.toString(),
+                chatRoom = _room.value?.id ?: "",
+                files = files,
+                status = Constants.SEND
+            )
+        )
+    }
+
+    fun setMessages(messages: List<MessageModel>) {
+        _chats.value = messages
     }
 
     private fun startTimer() = viewModelScope.launch {

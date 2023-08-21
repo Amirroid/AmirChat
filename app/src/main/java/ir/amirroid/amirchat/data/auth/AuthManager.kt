@@ -3,19 +3,12 @@ package ir.amirroid.amirchat.data.auth
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.firestore.ktx.toObjects
-import com.google.firebase.ktx.Firebase
-import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageReference
-import com.google.firebase.storage.ktx.storage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import ir.amirroid.amirchat.data.helpers.AppSignatureHelper
 import ir.amirroid.amirchat.data.helpers.TokenHelper
+import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.utils.Constants
 import kotlinx.coroutines.CoroutineScope
@@ -101,12 +94,15 @@ class AuthManager @Inject constructor(
             ref.putStream(fis).addOnCompleteListener {
                 if (it.isSuccessful) {
                     ref.downloadUrl.addOnSuccessListener { downloadUri ->
-                        userDatabase.add(
+                        val model =
                             UserModel(
                                 token, phone, firstName, lastName, id, bio, downloadUri.toString()
                             )
+                        userDatabase.add(
+                            model
                         ).addOnSuccessListener {
                             scope.launch {
+                                CurrentUser.setUser(model)
                                 tokenHelper.apply {
                                     setToken(token)
                                     setFirstName(firstName)
@@ -124,11 +120,14 @@ class AuthManager @Inject constructor(
             }
         } else {
             val downloadUri = ""
-            userDatabase.add(
+            val model =
                 UserModel(
                     token, phone, firstName, lastName, id, bio, downloadUri
                 )
+            userDatabase.add(
+                model
             ).addOnSuccessListener {
+                CurrentUser.setUser(model)
                 scope.launch {
                     tokenHelper.apply {
                         setToken(token)
@@ -170,6 +169,15 @@ class AuthManager @Inject constructor(
                     }
                 }
             } else onComplete.invoke()
+        }
+    }
+
+    fun getMyUser(onComplete: () -> Unit) {
+        if (CurrentUser.token != null) {
+            userDatabase.whereEqualTo("token", CurrentUser.token).get().addOnSuccessListener {
+                CurrentUser.setUser(it.first().toObject(UserModel::class.java))
+                onComplete.invoke()
+            }
         }
     }
 }

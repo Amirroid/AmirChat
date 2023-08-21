@@ -1,6 +1,10 @@
 package ir.amirroid.amirchat.di
 
 import android.content.Context
+import com.google.firebase.database.ktx.database
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreSettings
+import com.google.firebase.firestore.LocalCacheSettings
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.ktx.storage
@@ -41,5 +45,17 @@ object NetModule {
     @Singleton
     fun provideFirestore(
         firebase: Firebase
-    ) = firebase.firestore
+    ): FirebaseFirestore {
+        val fireStore = firebase.firestore
+        fireStore.firestoreSettings = FirebaseFirestoreSettings.Builder()
+            .setCacheSizeBytes(FirebaseFirestoreSettings.CACHE_SIZE_UNLIMITED)
+            .build()
+        return fireStore
+    }
+
+    @Provides
+    @Singleton
+    fun provideDatabase(
+        firebase: Firebase
+    ) = firebase.database.reference
 }

@@ -51,7 +51,7 @@ import ir.amirroid.amirchat.utils.SimpleList
 @Composable
 fun ChatPopUp(
     visible: Boolean,
-    onDismissRequest: () -> Unit
+    onDismissRequest: (Int) -> Unit
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -75,7 +75,7 @@ fun ChatPopUp(
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     detectTapGestures {
-                        onDismissRequest.invoke()
+                        onDismissRequest.invoke(-1)
                     }
                 }, contentAlignment = Alignment.Center
         ) {
@@ -138,7 +138,7 @@ fun ChatPopUp(
                             })
                         DropdownMenuItem(
                             text = { Text(text = stringResource(id = R.string.delete)) },
-                            onClick = { },
+                            onClick = { onDismissRequest.invoke(5) },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Outlined.Delete,
@@ -164,7 +164,11 @@ fun ColumnScope.ChatUi() {
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         ChatSmallToolbar {}
-        MessagesList(messages = SimpleList.listMessages, showPattern = true, replyEnabled = false, onClick = {}) {
+        MessagesList(
+            messages = emptyList(),
+            showPattern = true,
+            replyEnabled = false,
+            onClick = {}) {
 
         }
     }

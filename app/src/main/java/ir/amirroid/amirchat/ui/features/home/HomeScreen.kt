@@ -38,6 +38,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,11 +59,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.google.gson.Gson
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.models.chat.ChatRoom
+import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.ui.components.ChatPopUp
 import ir.amirroid.amirchat.ui.components.UserListItem
 import ir.amirroid.amirchat.utils.ChatPages
 import ir.amirroid.amirchat.utils.SimpleList
+import ir.amirroid.amirchat.utils.id
 import ir.amirroid.amirchat.viewmodels.home.HomeViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -80,7 +85,7 @@ fun HomeScreen(
     val phoneNumber by viewModel.mobile.collectAsStateWithLifecycle(initialValue = "")
     val firstName by viewModel.firstName.collectAsStateWithLifecycle(initialValue = "")
     val lastName by viewModel.lastName.collectAsStateWithLifecycle(initialValue = "")
-    val profiles = SimpleList.listProfiles
+    val rooms by viewModel.rooms.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val density = LocalDensity.current
@@ -88,13 +93,16 @@ fun HomeScreen(
     val matrix = context.resources.displayMetrics
     val widthDrawer = matrix.widthPixels * .7f
     val widthDpDrawer = with(density) { widthDrawer.toDp() }
-    var showChatPopUp by remember {
-        mutableStateOf(false)
+    var popUpChatRoom by remember {
+        mutableStateOf<ChatRoom?>(null)
+    }
+    val showChatPopUp by remember {
+        derivedStateOf { popUpChatRoom != null }
     }
     val blurChats by animateDpAsState(targetValue = if (showChatPopUp) 10.dp else 0.dp, label = "")
     BackHandler {
         if (showChatPopUp) {
-            showChatPopUp = false
+            popUpChatRoom = null
         } else (context as Activity).finish()
     }
     ModalNavigationDrawer(
@@ -155,19 +163,29 @@ fun HomeScreen(
                     .padding(paddingValues)
                     .fillMaxSize()
             ) {
-                items(profiles.size) {
-                    val user = profiles[it]
-                    UserListItem(profile = user, density = density, onClick = {
-                        navigation.navigate(ChatPages.ChatScreen.route)
+                items(rooms.size) {
+                    val room = rooms[it]
+                    UserListItem(room = room, density = density, onClick = {
+                        val toUser = if (room.from.token == CurrentUser.token) {
+                            room.to
+                        } else room.from
+                        navigation.navigate(
+                            ChatPages.ChatScreen.route + "?id=" + room.id + "&user=" + Gson().toJson(
+                                toUser
+                            )
+                        )
                     }) {
-                        showChatPopUp = true
+                        popUpChatRoom = room
                     }
                 }
             }
         }
     }
     ChatPopUp(visible = showChatPopUp) {
-        showChatPopUp = false
+        when (it) {
+            5 -> viewModel.deleteRoom(popUpChatRoom!!)
+        }
+        popUpChatRoom = null
     }
 }
 

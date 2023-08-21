@@ -1,5 +1,8 @@
 package ir.amirroid.amirchat.ui.components
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,6 +19,11 @@ import androidx.compose.material3.SmallTopAppBar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -27,6 +35,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import ir.amirroid.amirchat.data.models.chat.FileMessage
+import ir.amirroid.amirchat.data.models.register.CurrentUser
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,16 +45,27 @@ fun ChatMediaPopUp(
     show: Boolean,
     size: Size,
     offset: Offset,
+    file: FileMessage?,
     message: String,
     onDismissRequest: () -> Unit,
 ) {
+    val context = LocalContext.current
     MediaPopUp(show = show, size = size, offset = offset, mediaContent = {
         Zoomable {
+            var bitmap by remember {
+                mutableStateOf<Bitmap?>(null)
+            }
+            LaunchedEffect(key1 = Unit) {
+                try {
+                    bitmap = BitmapFactory.decodeFile(file?.fromPath)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                ImageRequest.Builder(context).data(file?.path).allowHardware(true)
+                    .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
+            }
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .allowHardware(true)
-                    .data("https://www.alamto.com/wp-content/uploads/2023/05/flower-9.jpg")
-                    .build(),
+                model = bitmap,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = if (it) ContentScale.Fit else ContentScale.Crop,

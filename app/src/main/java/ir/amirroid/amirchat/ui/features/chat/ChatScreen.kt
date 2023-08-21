@@ -57,6 +57,7 @@ import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -74,6 +75,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -87,7 +89,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.models.chat.FileMessage
+import ir.amirroid.amirchat.data.models.chat.MessageModel
+import ir.amirroid.amirchat.data.models.register.CurrentUser
+import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.ui.components.AudioRecordedPreview
 import ir.amirroid.amirchat.ui.components.AudioRecorderField
 import ir.amirroid.amirchat.ui.components.ChatMediaPopUp
@@ -97,6 +104,7 @@ import ir.amirroid.amirchat.ui.components.MessagesList
 import ir.amirroid.amirchat.ui.components.StickerTextField
 import ir.amirroid.amirchat.utils.ChatPages
 import ir.amirroid.amirchat.utils.Constants
+import ir.amirroid.amirchat.utils.getName
 import ir.amirroid.amirchat.viewmodels.ChatViewModel
 import ir.amirroid.emojikeyboard2.EmojiKeyboard
 import kotlinx.coroutines.delay
@@ -105,12 +113,9 @@ import java.io.File
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
-fun ChatScreen(navigation: NavController) {
+fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
     val viewModel: ChatViewModel = hiltViewModel()
     val context = LocalContext.current
-    val messages = remember {
-        mutableStateListOf<Pair<String, Boolean>>()
-    }
     val isRecording by viewModel.isRecording.collectAsStateWithLifecycle()
     val lazyState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -119,6 +124,9 @@ fun ChatScreen(navigation: NavController) {
     }
     var filePopupShow by remember {
         mutableStateOf(false)
+    }
+    var popUpMedia by remember {
+        mutableStateOf<Pair<MessageModel, FileMessage>?>(null)
     }
     var showChatMedia by remember {
         mutableStateOf(false)
@@ -129,6 +137,7 @@ fun ChatScreen(navigation: NavController) {
     var sizeChatMedia by remember {
         mutableStateOf(Size.Zero)
     }
+    val messages by viewModel.chats.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val currentTimeAudio by viewModel.currentTimeAudio.collectAsStateWithLifecycle()
     val currentTimePlayingAudio by viewModel.currentTimePlayingAudio.collectAsStateWithLifecycle()
@@ -136,17 +145,12 @@ fun ChatScreen(navigation: NavController) {
     val currentPathRecording by viewModel.currentRecordingPath.collectAsStateWithLifecycle()
     val currentMusic by viewModel.currentMusic.collectAsStateWithLifecycle()
     DisposableEffect(key1 = Unit) {
+        viewModel.observeToChats(room, user)
         onDispose { focusManager.clearFocus() }
     }
     LaunchedEffect(key1 = messages.size) {
-        try {
-            if (messages.last().second) {
-                delay(1000)
-                messages.add(messages.last().copy(second = false))
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        delay(200)
+        lazyState.animateScrollToItem(messages.size)
     }
     Scaffold(bottomBar = {
         AnimatedContent(targetState = showRecordPreview, transitionSpec = {
@@ -154,16 +158,14 @@ fun ChatScreen(navigation: NavController) {
         }, label = "") {
             if (it) {
                 val uri = Uri.fromFile(File(currentPathRecording))
-                AudioRecordedPreview(
-                    duration = currentTimeAudio,
+                AudioRecordedPreview(duration = currentTimeAudio,
                     position = currentTimePlayingAudio,
                     playing = uri == currentMusic,
                     onPlayRequest = { play ->
                         viewModel.playOrPauseMusic(play, uri, calculateTime = true)
                     },
                     onValueChanged = { seek -> viewModel.seekTo(seek) },
-                    onDelete = { viewModel.cancelRecording() }
-                )
+                    onDelete = { viewModel.cancelRecording() })
             } else {
                 if (isRecording) {
                     AudioRecorderField(timeRecording = currentTimeAudio, onCancel = {
@@ -172,15 +174,17 @@ fun ChatScreen(navigation: NavController) {
                         viewModel.stopRecording(it)
                     }
                 } else {
-                    TextFieldChat(
-                        onRecord = { viewModel.requestRecord() },
-                        onFileRequest = {
-                            viewModel.getMedias()
-                            filePopupShow = true
-                        }
-                    ) {
+                    TextFieldChat(onRecord = { viewModel.requestRecord() }, onFileRequest = {
+                        viewModel.getMedias()
+                        filePopupShow = true
+                    }) { text ->
                         focusManager.clearFocus()
-                        messages.add(Pair(it, true))
+                        viewModel.setMessages(
+                            messages.toMutableList().apply {
+                                add(MessageModel(text, from = CurrentUser.token ?: ""))
+                            }
+                        )
+                        viewModel.addMessage(text)
                         scope.launch {
                             lazyState.animateScrollToItem(messages.size)
                         }
@@ -189,80 +193,80 @@ fun ChatScreen(navigation: NavController) {
             }
         }
     }, topBar = {
-        AppBarChat({
+        AppBarChat(user = user, {
             navigation.popBackStack()
         }) {
             navigation.navigate(ChatPages.ProfileScreen.route)
         }
-    },
-        floatingActionButton = {
-            AnimatedVisibility(
-                visible = lazyState.canScrollForward,
-                enter = fadeIn() + scaleIn(),
-                exit = fadeOut() + scaleOut(),
+    }, floatingActionButton = {
+        AnimatedVisibility(
+            visible = lazyState.canScrollForward,
+            enter = fadeIn() + scaleIn(),
+            exit = fadeOut() + scaleOut(),
+        ) {
+            Card(
+                modifier = Modifier.size(48.dp), shape = CircleShape
             ) {
-                Card(
+                Box(
                     modifier = Modifier
-                        .size(48.dp),
-                    shape = CircleShape
+                        .fillMaxSize()
+                        .clickable {
+                            scope.launch {
+                                lazyState.animateScrollToItem(messages.size)
+                            }
+                        }, contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable {
-                                scope.launch {
-                                    lazyState.animateScrollToItem(messages.size)
-                                }
-                            }, contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = "down"
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowDown, contentDescription = "down"
+                    )
                 }
             }
-        }) { paddingValues ->
-        MessagesList(
-            modifier = Modifier.padding(paddingValues),
+        }
+    }) { paddingValues ->
+        MessagesList(modifier = Modifier.padding(paddingValues),
             lazyState = lazyState,
             messages = messages,
             onClick = { popUpChat = it },
-            onContentClick = { offset, size ->
+            onContentClick = { offset, size, pair ->
                 offsetChatMedia = offset
                 sizeChatMedia = size
+                popUpMedia = pair
                 showChatMedia = true
-            }
-        ) {
+            }) {
 
         }
     }
     MessagePopUp(offset = popUpChat, context, popUpChat != Offset.Zero) {
         popUpChat = Offset.Zero
     }
-    FileSelectorBottomSheet(show = filePopupShow, viewModel = viewModel) {
+    FileSelectorBottomSheet(show = filePopupShow, viewModel = viewModel, onDismissRequest = {
         filePopupShow = false
+    }) { caption, files ->
+        viewModel.setMessages(
+            messages.toMutableList().apply {
+                add(MessageModel(caption, files, from = CurrentUser.token ?: ""))
+            }
+        )
+        viewModel.addMessage(caption, files)
     }
     ChatMediaPopUp(
         show = showChatMedia,
         size = sizeChatMedia,
         offset = offsetChatMedia,
-        message = messages.lastOrNull()?.first ?: ""
+        message = popUpMedia?.first?.message ?: "",
+        file = popUpMedia?.second
     ) {
         showChatMedia = false
     }
 }
 
 @OptIn(
-    ExperimentalAnimationApi::class,
-    ExperimentalFoundationApi::class, ExperimentalLayoutApi::class
+    ExperimentalAnimationApi::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class
 )
 @SuppressLint("UnusedContentLambdaTargetStateParameter")
 @Composable
 fun TextFieldChat(
-    onRecord: () -> Unit,
-    onFileRequest: () -> Unit,
-    onSend: (String) -> Unit
+    onRecord: () -> Unit, onFileRequest: () -> Unit, onSend: (String) -> Unit
 ) {
     var text by remember {
         mutableStateOf("")
@@ -299,8 +303,7 @@ fun TextFieldChat(
             .navigationBarsPadding()
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Bottom
+            modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom
         ) {
             Box(modifier = Modifier.height(64.dp), contentAlignment = Alignment.Center) {
                 IconButton(onClick = {
@@ -313,8 +316,7 @@ fun TextFieldChat(
                     )
                 }
             }
-            StickerTextField(
-                value = text,
+            StickerTextField(value = text,
                 onValueChanged = {
                     text = it
                 },
@@ -327,10 +329,8 @@ fun TextFieldChat(
                 showKeyboard = showKeyboard,
                 onFocusChanged = {
                     showKeyboard = it
-                    if (it)
-                        showEmojiKeyboard = false
-                }
-            )
+                    if (it) showEmojiKeyboard = false
+                })
             Box(modifier = Modifier.height(64.dp), contentAlignment = Alignment.Center) {
                 AnimatedContent(targetState = text.isEmpty(), label = "", transitionSpec = {
                     fadeIn() with fadeOut()
@@ -340,7 +340,11 @@ fun TextFieldChat(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(onClick = onFileRequest) {
+                            IconButton(onClick = {
+                                showKeyboard = false
+                                showEmojiKeyboard = false
+                                onFileRequest.invoke()
+                            }) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.round_attach_file_24),
                                     contentDescription = "file",
@@ -357,9 +361,7 @@ fun TextFieldChat(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .combinedClickable(
-                                            onLongClick = onRecord,
-                                            onClick = {}),
+                                        .combinedClickable(onLongClick = onRecord, onClick = {}),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
@@ -385,8 +387,7 @@ fun TextFieldChat(
                 }
             }
         }
-        EmojiKeyboard(
-            visible = showEmojiKeyboard && showKeyboard.not(),
+        EmojiKeyboard(visible = showEmojiKeyboard && showKeyboard.not(),
             keyboardSize = heightKeyboard,
             placeHolder = stringResource(R.string.search),
             text = text,
@@ -396,8 +397,7 @@ fun TextFieldChat(
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
-            }
-        ) {
+            }) {
             text += it
         }
     }
@@ -405,7 +405,7 @@ fun TextFieldChat(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppBarChat(onBack: () -> Unit, onProfileClick: () -> Unit) {
+fun AppBarChat(user: UserModel, onBack: () -> Unit, onProfileClick: () -> Unit) {
     val appBarColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
     SmallTopAppBar(title = {
         Row(modifier = Modifier
@@ -416,15 +416,17 @@ fun AppBarChat(onBack: () -> Unit, onProfileClick: () -> Unit) {
                 }
             }) {
             AsyncImage(
-                model = "https://www.alamto.com/wp-content/uploads/2023/05/flower-9.jpg",
+                model = ImageRequest.Builder(context = LocalContext.current)
+                    .data(user.profilePictureUrl).crossfade(200).crossfade(true).build(),
                 contentDescription = "profile",
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(CircleShape)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
             )
             Column(modifier = Modifier.padding(start = 8.dp)) {
                 Text(
-                    text = "Amirreza",
+                    text = user.getName(),
                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp)
                 )
                 Text(

@@ -134,6 +134,7 @@ import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.models.chat.FileMessage
 import ir.amirroid.amirchat.data.models.media.ContactModel
 import ir.amirroid.amirchat.data.models.media.FileModel
 import ir.amirroid.amirchat.data.models.media.MediaModel
@@ -146,6 +147,7 @@ import ir.amirroid.amirchat.utils.getImage
 import ir.amirroid.amirchat.utils.getNavigationBarHeight
 import ir.amirroid.amirchat.utils.getStatusBarHeight
 import ir.amirroid.amirchat.utils.getType
+import ir.amirroid.amirchat.utils.getTypeForFile
 import ir.amirroid.amirchat.utils.toDp
 import ir.amirroid.amirchat.viewmodels.ChatViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -164,7 +166,8 @@ fun FileSelectorBottomSheet(
     show: Boolean,
     viewModel: ChatViewModel,
     context: Context = LocalContext.current,
-    onDismissRequest: () -> Unit
+    onDismissRequest: () -> Unit,
+    onSend: (String, List<FileMessage>) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val gallery = stringResource(id = R.string.gallery)
@@ -176,23 +179,24 @@ fun FileSelectorBottomSheet(
         mutableStateOf(gallery)
     }
     val selectedItems = remember {
-        mutableStateListOf<Long>()
+        mutableStateListOf<String>()
     }
-    LaunchedEffect(key1 = show) {
-        if (show) {
-            currentType = gallery
-            selectedItems.clear()
-        }
-    }
-    var cation by remember {
+    var caption by remember {
         mutableStateOf("")
     }
     val initialSize = remember {
         Animatable(0.7f)
     }
+    LaunchedEffect(key1 = show) {
+        if (show) {
+            caption = ""
+            currentType = gallery
+            selectedItems.clear()
+        }
+    }
     LaunchedEffect(key1 = currentType) {
         selectedItems.clear()
-        cation = ""
+        caption = ""
         initialSize.animateTo(0.65f, tween(200))
         initialSize.animateTo(0.7f, tween(200))
     }
@@ -216,8 +220,8 @@ fun FileSelectorBottomSheet(
                     Box(
                         contentAlignment = Alignment.BottomCenter, modifier = Modifier
                     ) {
-                        TextField(value = cation,
-                            onValueChange = { value -> cation = value },
+                        TextField(value = caption,
+                            onValueChange = { value -> caption = value },
                             colors = getBasicColorsOfTextField(),
                             shape = RectangleShape,
                             modifier = Modifier
@@ -241,7 +245,21 @@ fun FileSelectorBottomSheet(
                             contentAlignment = Alignment.BottomEnd
                         ) {
                             FloatingActionButton(
-                                onClick = {},
+                                onClick = {
+                                    onSend.invoke(
+                                        caption,
+                                        selectedItems.map { path ->
+                                            FileMessage(
+                                                path,
+                                                path,
+                                                getTypeForFile(currentType, context)
+                                            )
+                                        }
+                                    )
+                                    onDismissRequest.invoke()
+                                    selectedItems.clear()
+                                    caption = ""
+                                },
                                 shape = CircleShape,
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
@@ -369,7 +387,7 @@ fun MusicsView(
     context: Context,
     musics: StateFlow<List<MusicModel>>,
     currentPlayingMusic: StateFlow<Uri?>,
-    selectedItems: SnapshotStateList<Long>,
+    selectedItems: SnapshotStateList<String>,
     onPlayRequest: (Uri, Boolean) -> Unit
 ) {
     val musicsState = remember {
@@ -434,12 +452,12 @@ fun MusicsView(
                         music = music,
                         currentPlayingMusicState,
                         onPlayRequest,
-                        selectedItems.contains(music.id)
+                        selectedItems.contains(music.data)
                     ) { select ->
                         if (select) {
-                            selectedItems.add(music.id)
+                            selectedItems.add(music.data)
                         } else {
-                            selectedItems.remove(music.id)
+                            selectedItems.remove(music.data)
                         }
                     }
                     Divider(
@@ -559,7 +577,7 @@ fun ContactView(contact: ContactModel, brush: Brush) {
 
 @Composable
 fun FileView(
-    context: Context, files: StateFlow<List<FileModel>>, selectedItems: SnapshotStateList<Long>
+    context: Context, files: StateFlow<List<FileModel>>, selectedItems: SnapshotStateList<String>
 ) {
     val filesState by files.collectAsStateWithLifecycle()
     LazyColumnWithHelperButton(modifier = Modifier.fillMaxSize(), count = filesState.count()) {
@@ -575,12 +593,12 @@ fun FileView(
             FileView(
                 file = file,
                 context = context,
-                selected = selectedItems.contains(file.id),
+                selected = selectedItems.contains(file.data),
             ) { select ->
                 if (select) {
-                    selectedItems.add(file.id)
+                    selectedItems.add(file.data)
                 } else {
-                    selectedItems.remove(file.id)
+                    selectedItems.remove(file.data)
                 }
             }
         }
@@ -707,7 +725,7 @@ fun TypeItemButton(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GalleyView(
-    context: Context, medias: StateFlow<List<MediaModel>>, selectedItems: SnapshotStateList<Long>
+    context: Context, medias: StateFlow<List<MediaModel>>, selectedItems: SnapshotStateList<String>
 ) {
     val mediaState by medias.collectAsStateWithLifecycle(initialValue = emptyList())
     var showPopUpMedia by remember {
@@ -734,11 +752,11 @@ fun GalleyView(
     ) {
         items(mediaState.size, key = { mediaState[it].id }) { index ->
             val media = mediaState[index]
-            val selected = selectedItems.contains(media.id)
+            val selected = selectedItems.contains(media.data)
             MediaView(context,
                 media = media,
                 selected = selected,
-                indexSelect = if (selected) selectedItems.indexOf(media.id).plus(1) else 0,
+                indexSelect = if (selected) selectedItems.indexOf(media.data).plus(1) else 0,
                 onClick = { offsetClick, sizeClick ->
                     offset = offsetClick
                     size = sizeClick
@@ -747,15 +765,15 @@ fun GalleyView(
                     scope.launch { pagerState.scrollToPage(index) }
                 }) { select ->
                 if (select) {
-                    selectedItems.add(media.id)
+                    selectedItems.add(media.data)
                 } else {
-                    selectedItems.remove(media.id)
+                    selectedItems.remove(media.data)
                 }
             }
         }
     }
     val media = mediaState.getOrNull(pagerState.currentPage)
-    val selected = selectedItems.contains(media?.id)
+    val selected = selectedItems.contains(media?.data)
     MediaPopUpWithAnimation(show = showPopUpMedia,
         size = size,
         offset = offset,
@@ -765,9 +783,9 @@ fun GalleyView(
         selectedItems.count(),
         onSelect = { select ->
             if (select) {
-                selectedItems.add(media!!.id)
+                selectedItems.add(media!!.data)
             } else {
-                selectedItems.remove(media!!.id)
+                selectedItems.remove(media!!.data)
             }
         }) {
         scope.launch { pagerState.scrollToPage(indexMediaShowed) }

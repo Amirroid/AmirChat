@@ -31,7 +31,8 @@ class TokenHelper @Inject constructor(
         while (token.length < 72) {
             token += generateRandomString()
         }
-        return token
+        return token.replace("]", "S").replace("[", "J").replace(".", "F").replace("#", "V")
+            .replace("$", "D")
     }
 
     object Keys {
@@ -43,24 +44,24 @@ class TokenHelper @Inject constructor(
     }
 
     val firstName = preferences.data.map {
-        it[Keys.firstName] ?: ""
+        it[Keys.firstName]
     }
 
     val lastName = preferences.data.map {
-        it[Keys.lastName] ?: ""
+        it[Keys.lastName]
     }
 
     val token = preferences.data.map {
-        it[Keys.token] ?: ""
+        it[Keys.token]
     }
 
 
     val image = preferences.data.map {
-        it[Keys.image] ?: ""
+        it[Keys.image]
     }
 
     val mobile = preferences.data.map {
-        it[Keys.mobile] ?: ""
+        it[Keys.mobile]
     }
 
     init {

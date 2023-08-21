@@ -403,15 +403,14 @@ fun RegisterScreen(
                             Dialog(onDismissRequest = {}) {
                                 Surface(
                                     modifier = Modifier
-                                        .background(MaterialTheme.colorScheme.background)
                                         .fillMaxWidth()
-                                        .wrapContentHeight()
-                                        .padding(vertical = 12.dp),
-                                    shape = MaterialTheme.shapes.medium
+                                        .wrapContentHeight(),
+                                    shape = MaterialTheme.shapes.medium,
                                 ) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .padding(vertical = 24.dp)
                                             .padding(start = 12.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {

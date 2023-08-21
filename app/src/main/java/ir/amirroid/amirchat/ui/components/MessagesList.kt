@@ -45,6 +45,10 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.models.chat.FileMessage
+import ir.amirroid.amirchat.data.models.chat.MessageModel
+import ir.amirroid.amirchat.data.models.register.CurrentUser
+import ir.amirroid.amirchat.utils.formatTimeHourMinute
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -52,19 +56,19 @@ import kotlinx.coroutines.launch
 @Composable
 fun MessagesList(
     lazyState: LazyListState = rememberLazyListState(),
-    messages: List<Pair<String, Boolean>>,
+    messages: List<MessageModel>,
     modifier: Modifier = Modifier,
     showPattern: Boolean = true,
     replyEnabled: Boolean = true,
     onClick: (Offset) -> Unit,
-    onContentClick: ((Offset, Size) -> Unit)? = null,
+    onContentClick: ((Offset, Size, Pair<MessageModel, FileMessage>) -> Unit)? = null,
     onLongClick: () -> Unit
 ) {
     val context = LocalContext.current
     val configuration = context.resources.configuration
     val maxWidth = (configuration.screenWidthDp * 0.7f).dp
     val animatedList = remember {
-        mutableStateListOf<Pair<String, Boolean>>()
+        mutableStateListOf<MessageModel>()
     }
     Box {
         if (showPattern) {
@@ -100,8 +104,8 @@ fun MessagesList(
                 ) {
                     MessageView(
                         maxWidth,
-                        message.first,
-                        message.second,
+                        message,
+                        message.from == CurrentUser.token,
                         replyEnabled,
                         onClick,
                         onLongClick,
