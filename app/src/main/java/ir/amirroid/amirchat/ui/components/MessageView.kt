@@ -1,9 +1,12 @@
 package ir.amirroid.amirchat.ui.components
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
+import android.net.Uri
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.scaleIn
@@ -21,6 +24,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,15 +34,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -50,6 +61,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -57,31 +69,42 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
-import androidx.core.net.toFile
-import androidx.core.net.toUri
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.google.gson.Gson
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.events.MessageEvents
 import ir.amirroid.amirchat.data.models.chat.FileMessage
 import ir.amirroid.amirchat.data.models.chat.MessageModel
+import ir.amirroid.amirchat.data.models.media.ContactModel
+import ir.amirroid.amirchat.data.models.media.MusicModelForJson
 import ir.amirroid.amirchat.data.models.register.CurrentUser
+import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.utils.Constants
+import ir.amirroid.amirchat.utils.formatTime
 import ir.amirroid.amirchat.utils.formatTimeHourMinute
 import ir.amirroid.amirchat.utils.getColorOfMessage
+import ir.amirroid.amirchat.utils.getName
 import ir.amirroid.amirchat.utils.getShapeOfMessage
 import ir.amirroid.amirchat.utils.getTextColorOfMessage
 import ir.amirroid.amirchat.utils.toDp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import java.io.File
 
 @Composable
 fun MessageView(
@@ -91,16 +114,28 @@ fun MessageView(
     replyEnabled: Boolean = true,
     onClick: (Offset) -> Unit,
     onLongClick: () -> Unit,
-    onContentClick: ((Offset, Size, Pair<MessageModel, FileMessage>) -> Unit)? = null
+    playingMusic: Uri,
+    onMessageEvent: ((MessageEvents) -> Unit)? = null,
+    currentPosition: Long? = null,
+    onContentClick: ((Offset, Size, Pair<MessageModel, FileMessage>) -> Unit)? = null,
+    replyMessage: MessageModel?,
+    to: UserModel
 ) {
-    SwipeBox(paddingEnd = if (isMyUser) 0.dp else 12.dp, enabled = replyEnabled) {
+    SwipeBox(paddingEnd = if (isMyUser) 0.dp else 12.dp, enabled = replyEnabled, onReplyRequest = {
+        onMessageEvent?.invoke(MessageEvents.Reply(message.id))
+    }) {
         MessageView(
             message = message,
             maxWidth = maxWidth,
             isMyUser,
             onClick,
             onLongClick,
-            onContentClick
+            playingMusic,
+            currentPosition,
+            onContentClick,
+            onMessageEvent,
+            replyMessage,
+            to
         )
     }
 }
@@ -113,7 +148,12 @@ fun RowScope.MessageView(
     isMyUser: Boolean,
     onClick: (Offset) -> Unit,
     onLongClick: () -> Unit,
-    onContentClick: ((Offset, Size, Pair<MessageModel, FileMessage>) -> Unit)? = null
+    playingMusic: Uri,
+    currentPosition: Long? = null,
+    onContentClick: ((Offset, Size, Pair<MessageModel, FileMessage>) -> Unit)? = null,
+    onMessageEvent: ((MessageEvents) -> Unit)?,
+    replyMessage: MessageModel?,
+    to: UserModel
 ) {
     var position by remember {
         mutableStateOf(Offset.Zero)
@@ -142,14 +182,71 @@ fun RowScope.MessageView(
                     position = it.positionInWindow()
                 }
         ) {
+            if (replyMessage != null) {
+                val name = if (replyMessage.from == CurrentUser.token) {
+                    CurrentUser.user?.getName() ?: ""
+                } else to.getName()
+                Box(
+                    modifier = Modifier
+                        .padding(2.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .fillMaxWidth()
+                ) {
+                    Box(modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { }) {
+                        val density = LocalDensity.current
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            var sizeBox by remember {
+                                mutableIntStateOf(0)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                                    .height(with(density) { sizeBox.toDp() } - 12.dp)
+                                    .width(4.dp)
+                            )
+                            Column(modifier = Modifier.onSizeChanged {
+                                sizeBox = it.height
+                            }.padding(start=8.dp)) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = name,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = replyMessage.message,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontSize = 12.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                        }
+                    }
+                }
+            }
             if (message.files.isNotEmpty()) {
-                FilesContent(message) { offset, size, file ->
+                FilesContent(
+                    message,
+                    currentPosition,
+                    playingMusic,
+                    onMessageEvent
+                ) { offset, size, file ->
                     onContentClick?.invoke(offset, size, Pair(message, file))
                 }
             }
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .then(
+                        if (message.files.isNotEmpty()) Modifier.fillMaxWidth() else Modifier.wrapContentWidth()
+                    )
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 if (message.message.isNotEmpty()) {
@@ -164,7 +261,7 @@ fun RowScope.MessageView(
                 Row(
                     modifier = Modifier
                         .align(Alignment.End)
-                        .padding(top = 8.dp)
+                        .padding(top = if (message.files.isNotEmpty()) 8.dp else 4.dp)
                         .alpha(0.7f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -192,10 +289,164 @@ fun RowScope.MessageView(
 }
 
 @Composable
-fun FilesContent(files: MessageModel, onContentClick: ((Offset, Size, FileMessage) -> Unit)?) {
-    when (files.files.first().type) {
+fun FilesContent(
+    message: MessageModel,
+    currentPosition: Long? = null,
+    playingMusic: Uri,
+    onMessageEvent: ((MessageEvents) -> Unit)? = null,
+    onContentClick: ((Offset, Size, FileMessage) -> Unit)?
+) {
+    when (message.files.first().type) {
         Constants.GALLERY -> {
-            GalleryView(files, onContentClick)
+            GalleryView(message, onContentClick)
+        }
+
+        Constants.MUSIC -> {
+            MusicsView(message, currentPosition, playingMusic, onContentClick, onMessageEvent)
+        }
+
+        Constants.CONTACT -> {
+            ContactView(message)
+        }
+    }
+}
+
+@Composable
+fun ContactView(message: MessageModel) {
+    val contact = Gson().fromJson(message.files.first().data, ContactModel::class.java)
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            NameView(name = contact.name, brush = Constants.randomBrush.first(), circleShape = true)
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text(
+                    text = contact.name,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                )
+                contact.numbers.forEach {
+                    Text(text = it, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+        }
+        OutlinedButton(
+            onClick = {}, modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .fillMaxWidth()
+        ) {
+            Text(
+                text = stringResource(id = R.string.view_contact),
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+    }
+}
+
+@Composable
+fun MusicsView(
+    message: MessageModel,
+    currentPosition: Long? = null,
+    playingMusic: Uri, onContentClick: ((Offset, Size, FileMessage) -> Unit)?,
+    onMessageEvent: ((MessageEvents) -> Unit)? = null,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        message.files.forEach { file ->
+            MusicContent(file, playingMusic, onContentClick, currentPosition!!, onMessageEvent)
+        }
+    }
+}
+
+@SuppressLint("UnusedContentLambdaTargetStateParameter")
+@Composable
+fun MusicContent(
+    file: FileMessage,
+    playingMusic: Uri,
+    onContentClick: ((Offset, Size, FileMessage) -> Unit)?,
+    currentPosition: Long,
+    onMessageEvent: ((MessageEvents) -> Unit)?
+) {
+    var progress by remember(currentPosition) {
+        mutableFloatStateOf(currentPosition.toFloat())
+    }
+    val data = Gson().fromJson(file.data, MusicModelForJson::class.java)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .height(64.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        PlayButton(
+            play = playingMusic.toString() == file.path,
+            color = MaterialTheme.colorScheme.primary
+        ) {
+            onContentClick?.invoke(Offset.Zero, Size.Zero, file)
+        }
+        AnimatedContent(
+            targetState = playingMusic.toString() == file.path,
+            label = "",
+            modifier = Modifier.padding(start = 12.dp)
+        ) {
+            if (it) {
+                Column {
+                    Slider(
+                        value = if (playingMusic.toString() == file.path) progress else 0f,
+                        onValueChange = { p ->
+                            progress = p
+                            onMessageEvent?.invoke(
+                                MessageEvents.SeekExo(
+                                    p.toLong()
+                                )
+                            )
+                        },
+                        valueRange = 0f..data.duration.toFloat()
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = currentPosition.formatTime(),
+                            modifier = Modifier
+                                .alpha(0.7f)
+                                .wrapContentSize(),
+                            style = TextStyle(fontSize = 12.sp)
+                        )
+                        Text(
+                            text = data.duration.minus(currentPosition).formatTime(),
+                            modifier = Modifier
+                                .alpha(0.7f)
+                                .wrapContentSize(),
+                            style = TextStyle(fontSize = 12.sp)
+                        )
+                    }
+                }
+            } else {
+                Column {
+                    Text(text = data.name, style = MaterialTheme.typography.bodyMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = data.artistName,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier
+                                .weight(1f),
+                            maxLines = 1
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = data.duration.formatTime(),
+                            modifier = Modifier
+                                .alpha(0.7f)
+                                .wrapContentSize(),
+                            style = TextStyle(fontSize = 12.sp),
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -269,7 +520,8 @@ fun GalleryView(message: MessageModel, onContentClick: ((Offset, Size, FileMessa
                                     .target { b -> bitmap = (b as BitmapDrawable).bitmap }
                                     .build()
                                 if (files.size.minus(1) >= index.plus(1)) {
-                                    bitmap2 = BitmapFactory.decodeFile(files[index.plus(1)].fromPath)
+                                    bitmap2 =
+                                        BitmapFactory.decodeFile(files[index.plus(1)].fromPath)
                                     ImageRequest.Builder(context)
                                         .data(files[index.plus(1)].path)
                                         .target { b ->
@@ -346,9 +598,10 @@ fun SwipeBox(
     context: Context = LocalContext.current,
     paddingEnd: Dp,
     enabled: Boolean,
+    onReplyRequest: () -> Unit,
     content: @Composable RowScope.() -> Unit = {}
 ) {
-    var offsetX = remember {
+    val offsetX = remember {
         androidx.compose.animation.core.Animatable(0f)
     }
     val alphaReply by animateFloatAsState(
@@ -367,6 +620,7 @@ fun SwipeBox(
         if (offsetX.value < -190f && hapticFeedbackDone.not()) {
             hapticFeedbackDone = true
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+            onReplyRequest.invoke()
         } else {
             hapticFeedbackDone = false
         }

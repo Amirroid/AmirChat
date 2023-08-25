@@ -5,5 +5,6 @@ import ir.amirroid.amirchat.utils.Constants
 data class FileMessage(
     val fromPath: String = "",
     val path: String = "",
-    val type: Int = Constants.SENDING
+    val type: Int = -1,
+    val data: String = ""
 )

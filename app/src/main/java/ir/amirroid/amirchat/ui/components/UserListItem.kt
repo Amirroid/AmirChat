@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import ir.amirroid.amirchat.data.models.chat.ChatRoom
 import ir.amirroid.amirchat.data.models.register.CurrentUser
@@ -121,7 +122,11 @@ fun UserListItem(
         )
         ListItem(headlineContent = { Text(text = user.getName()) }, leadingContent = {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(user.profilePictureUrl).crossfade(true)
+                model = ImageRequest.Builder(context).data(user.profilePictureUrl)
+                    .allowHardware(true)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .networkCachePolicy(CachePolicy.ENABLED)
+                    .diskCachePolicy(CachePolicy.ENABLED).crossfade(true)
                     .crossfade(300).build(),
                 contentDescription = null,
                 modifier = Modifier

@@ -8,10 +8,12 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.with
@@ -41,9 +43,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.Card
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -82,6 +86,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.EmojiSupportMatch
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
@@ -89,8 +95,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.events.MessageEvents
 import ir.amirroid.amirchat.data.models.chat.FileMessage
 import ir.amirroid.amirchat.data.models.chat.MessageModel
 import ir.amirroid.amirchat.data.models.register.CurrentUser
@@ -125,6 +133,7 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
     var filePopupShow by remember {
         mutableStateOf(false)
     }
+    val replyId by viewModel.reply.collectAsStateWithLifecycle()
     var popUpMedia by remember {
         mutableStateOf<Pair<MessageModel, FileMessage>?>(null)
     }
@@ -174,14 +183,27 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                         viewModel.stopRecording(it)
                     }
                 } else {
-                    TextFieldChat(onRecord = { viewModel.requestRecord() }, onFileRequest = {
-                        viewModel.getMedias()
-                        filePopupShow = true
-                    }) { text ->
+                    TextFieldChat(
+                        if (replyId == null) null else messages.firstOrNull { user -> user.id == replyId },
+                        user,
+                        onReplyCancel = {
+                            viewModel.reply.value = null
+                        },
+                        onRecord = { viewModel.requestRecord() }, onFileRequest = {
+                            viewModel.getMedias()
+                            filePopupShow = true
+                        }) { text ->
                         focusManager.clearFocus()
+                        viewModel.reply.value = null
                         viewModel.setMessages(
                             messages.toMutableList().apply {
-                                add(MessageModel(text, from = CurrentUser.token ?: ""))
+                                add(
+                                    MessageModel(
+                                        text,
+                                        from = CurrentUser.token ?: "",
+                                        replyToId = replyId
+                                    )
+                                )
                             }
                         )
                         viewModel.addMessage(text)
@@ -223,16 +245,43 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
             }
         }
     }) { paddingValues ->
-        MessagesList(modifier = Modifier.padding(paddingValues),
+        MessagesList(
+            modifier = Modifier.padding(paddingValues),
             lazyState = lazyState,
             messages = messages,
             onClick = { popUpChat = it },
             onContentClick = { offset, size, pair ->
-                offsetChatMedia = offset
-                sizeChatMedia = size
-                popUpMedia = pair
-                showChatMedia = true
-            }) {
+                when (pair.second.type) {
+                    Constants.GALLERY -> {
+                        offsetChatMedia = offset
+                        sizeChatMedia = size
+                        popUpMedia = pair
+                        showChatMedia = true
+                    }
+
+                    Constants.MUSIC -> {
+                        viewModel.playOrPauseMusicWithCache(
+                            pair.second,
+                            CurrentUser.token == pair.first.from,
+                            true
+                        )
+                    }
+                }
+            }, playingMusic = currentMusic ?: Uri.EMPTY,
+            currentPosition = currentTimePlayingAudio,
+            onMessageEvent = {
+                when (it) {
+                    is MessageEvents.SeekExo -> {
+                        viewModel.seekTo(it.position)
+                    }
+
+                    is MessageEvents.Reply -> {
+                        viewModel.reply.value = it.id
+                    }
+                }
+            },
+            to = user
+        ) {
 
         }
     }
@@ -244,7 +293,14 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
     }) { caption, files ->
         viewModel.setMessages(
             messages.toMutableList().apply {
-                add(MessageModel(caption, files, from = CurrentUser.token ?: ""))
+                add(
+                    MessageModel(
+                        caption,
+                        files,
+                        from = CurrentUser.token ?: "",
+                        replyToId = replyId
+                    )
+                )
             }
         )
         viewModel.addMessage(caption, files)
@@ -266,6 +322,9 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
 @SuppressLint("UnusedContentLambdaTargetStateParameter")
 @Composable
 fun TextFieldChat(
+    replyMessage: MessageModel?,
+    user: UserModel,
+    onReplyCancel: () -> Unit,
     onRecord: () -> Unit, onFileRequest: () -> Unit, onSend: (String) -> Unit
 ) {
     var text by remember {
@@ -302,6 +361,56 @@ fun TextFieldChat(
             .background(surfaceColor)
             .navigationBarsPadding()
     ) {
+        AnimatedVisibility(
+            visible = replyMessage != null,
+            enter = expandVertically(expandFrom = Alignment.Bottom),
+            exit = shrinkVertically(shrinkTowards = Alignment.Bottom)
+        ) {
+            val name = if (replyMessage?.from == CurrentUser.token) {
+                CurrentUser.user?.getName() ?: ""
+            } else user.getName()
+            Column {
+                Row(
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp))
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .height(56.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.round_reply_24),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Column(
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .weight(1f)
+                    ) {
+                        Text(
+                            text = name,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.fillMaxWidth(),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = replyMessage?.message ?: "",
+                            maxLines = 1,
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    IconButton(onClick = onReplyCancel) {
+                        Icon(imageVector = Icons.Rounded.Close, contentDescription = null)
+                    }
+                }
+                Divider()
+            }
+        }
         Row(
             modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom
         ) {
@@ -416,8 +525,7 @@ fun AppBarChat(user: UserModel, onBack: () -> Unit, onProfileClick: () -> Unit) 
                 }
             }) {
             AsyncImage(
-                model = ImageRequest.Builder(context = LocalContext.current)
-                    .data(user.profilePictureUrl).crossfade(200).crossfade(true).build(),
+                model = user.profilePictureUrl,
                 contentDescription = "profile",
                 modifier = Modifier
                     .size(40.dp)

@@ -139,11 +139,13 @@ class MediaHelper @Inject constructor(
         val idP = MediaStore.Audio.AudioColumns._ID
         val nameP = MediaStore.Audio.AudioColumns.DISPLAY_NAME
         val artistP = MediaStore.Audio.AudioColumns.ARTIST
+        val durationP = MediaStore.Audio.AudioColumns.DURATION
         val projection = arrayOf(
             idP,
             nameP,
             dataP,
-            artistP
+            artistP,
+            durationP
         )
         val sort = "${MediaStore.Images.ImageColumns.DATE_MODIFIED} DESC"
         val cursor = context.contentResolver.query(
@@ -160,6 +162,7 @@ class MediaHelper @Inject constructor(
             val nameC = it.getColumnIndex(nameP)
             val dataC = it.getColumnIndex(dataP)
             val artistC = it.getColumnIndex(artistP)
+            val durationC = it.getColumnIndex(durationP)
             do {
                 val id = it.getLong(idC)
                 val name = it.getString(nameC)
@@ -168,9 +171,10 @@ class MediaHelper @Inject constructor(
                     uri,
                     id
                 )
+                val duration = it.getLong(durationC)
                 val artist = it.getString(artistC)
                 list.add(
-                    MusicModel(name, artist, data, 0L, id, uriMusic)
+                    MusicModel(name, artist, data, duration, id, uriMusic)
                 )
             } while (it.moveToNext())
         }
@@ -192,6 +196,8 @@ class MediaHelper @Inject constructor(
         val dataP = MediaStore.Files.FileColumns.DATA
         val sizeP = MediaStore.Files.FileColumns.SIZE
         val idP = MediaStore.Files.FileColumns._ID
+        val mimTypeC = MediaStore.Files.FileColumns.MIME_TYPE
+        val selection = "$mimTypeC IN('application/pdf') OR $mimTypeC LIKE 'application/vnd%'"
         val projection = arrayOf(
             mimeTypeP,
             nameP,
@@ -203,7 +209,7 @@ class MediaHelper @Inject constructor(
         val cursor = context.contentResolver.query(
             uri,
             projection,
-            null,
+            selection,
             null,
             sort
         )

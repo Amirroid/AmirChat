@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.ui.features.chat.AppBarChat
 import ir.amirroid.amirchat.utils.SimpleList
 
@@ -168,7 +169,9 @@ fun ColumnScope.ChatUi() {
             messages = emptyList(),
             showPattern = true,
             replyEnabled = false,
-            onClick = {}) {
+            onClick = {},
+            to = UserModel()
+        ) {
 
         }
     }

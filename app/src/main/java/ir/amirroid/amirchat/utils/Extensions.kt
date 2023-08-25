@@ -16,6 +16,8 @@ import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.models.chat.ChatRoom
 import ir.amirroid.amirchat.data.models.media.FileModel
 import ir.amirroid.amirchat.data.models.media.MediaModel
+import ir.amirroid.amirchat.data.models.media.MusicModel
+import ir.amirroid.amirchat.data.models.media.MusicModelForJson
 import ir.amirroid.amirchat.data.models.register.UserModel
 import java.net.URLConnection
 import java.text.SimpleDateFormat
@@ -158,3 +160,13 @@ fun UserModel.getName() = "$firstName $lastName"
 
 val ChatRoom.id: String
     get() = "${this.from.token}-${this.to.token}"
+
+
+fun MusicModel.toJsonMusic() = MusicModelForJson(
+    name,
+    artistName,
+    data,
+    duration,
+    id,
+    uri.toString()
+)

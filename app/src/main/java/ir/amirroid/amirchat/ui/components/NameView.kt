@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun NameView(name: String, brush: Brush, circleShape: Boolean) {
+fun NameView(name: String, brush: Brush, circleShape: Boolean, modifier: Modifier = Modifier) {
     val generateList = name.split(" ")
     val generateName = if (generateList.size == 1) {
         generateList.first().first().uppercase()
@@ -29,6 +29,7 @@ fun NameView(name: String, brush: Brush, circleShape: Boolean) {
         modifier = Modifier
             .clip(if (circleShape) CircleShape else RectangleShape)
             .background(brush)
+            .then(modifier)
             .size(48.dp),
         contentAlignment = Alignment.Center
     ) {

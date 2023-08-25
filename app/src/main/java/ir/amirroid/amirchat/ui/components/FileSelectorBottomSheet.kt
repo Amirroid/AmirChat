@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,12 +66,14 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
@@ -80,9 +83,12 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBarDefaults
@@ -100,6 +106,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.focusRequester
@@ -130,6 +137,7 @@ import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.google.android.gms.maps.model.MapStyleOptions
+import com.google.gson.Gson
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
@@ -149,6 +157,7 @@ import ir.amirroid.amirchat.utils.getStatusBarHeight
 import ir.amirroid.amirchat.utils.getType
 import ir.amirroid.amirchat.utils.getTypeForFile
 import ir.amirroid.amirchat.utils.toDp
+import ir.amirroid.amirchat.utils.toJsonMusic
 import ir.amirroid.amirchat.viewmodels.ChatViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -246,15 +255,28 @@ fun FileSelectorBottomSheet(
                         ) {
                             FloatingActionButton(
                                 onClick = {
-                                    onSend.invoke(
-                                        caption,
+                                    val type = getTypeForFile(currentType, context)
+                                    val selectedItemsFilter =
                                         selectedItems.map { path ->
+                                            val data = when (type) {
+                                                Constants.MUSIC -> {
+                                                    val music =
+                                                        viewModel.musics.value[viewModel.musics.value.indexOfFirst { data -> data.data == path }]
+                                                    Gson().toJson(music.toJsonMusic())
+                                                }
+
+                                                else -> ""
+                                            }
                                             FileMessage(
                                                 path,
                                                 path,
-                                                getTypeForFile(currentType, context)
+                                                type,
+                                                data = data
                                             )
                                         }
+                                    onSend.invoke(
+                                        caption,
+                                        selectedItemsFilter
                                     )
                                     onDismissRequest.invoke()
                                     selectedItems.clear()
@@ -365,7 +387,19 @@ fun FileSelectorBottomSheet(
 
                 contacts -> {
                     viewModel.getContacts()
-                    ContactsView(context, viewModel.contacts)
+                    ContactsView(viewModel.contacts) { contact ->
+                        onSend.invoke(
+                            "",
+                            listOf(
+                                FileMessage(
+                                    data = Gson().toJson(contact),
+                                    type = Constants.CONTACT
+                                )
+                            )
+                        )
+                        selectedItems.clear()
+                        onDismissRequest.invoke()
+                    }
                 }
 
                 musics -> {
@@ -494,13 +528,20 @@ fun MusicView(
 }
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ContactsView(context: Context, contacts: StateFlow<List<ContactModel>>) {
+fun ContactsView(contacts: StateFlow<List<ContactModel>>, onSend: (ContactModel) -> Unit) {
     val contactsState = remember {
         mutableStateListOf<ContactModel>()
     }
     var searchText by remember {
         mutableStateOf("")
+    }
+    var sheetContact by remember {
+        mutableStateOf(false)
+    }
+    var selectedContact by remember {
+        mutableStateOf<ContactModel?>(null)
     }
     val scope = rememberCoroutineScope()
     LaunchedEffect(key1 = Unit) {
@@ -550,7 +591,10 @@ fun ContactsView(context: Context, contacts: StateFlow<List<ContactModel>>) {
                 val contact = contactsState[it]
                 val brush = Constants.randomBrush[it % 3]
                 Column {
-                    ContactView(contact = contact, brush)
+                    ContactView(contact = contact, brush) {
+                        selectedContact = contact
+                        sheetContact = true
+                    }
                     Divider(
                         modifier = Modifier
                             .fillMaxWidth(0.8f)
@@ -559,18 +603,99 @@ fun ContactsView(context: Context, contacts: StateFlow<List<ContactModel>>) {
                 }
             }
         }
+        if (sheetContact) {
+            val selectedNumbers = remember {
+                mutableStateListOf<String>()
+            }
+            LaunchedEffect(key1 = selectedContact) {
+                selectedNumbers.clear()
+                selectedNumbers.addAll(selectedContact?.numbers ?: emptyList())
+            }
+            ModalBottomSheet(
+                onDismissRequest = { sheetContact = false },
+                windowInsets = WindowInsets(0),
+                dragHandle = null
+            ) {
+                Column(
+                    modifier = Modifier
+                        .clip(
+                            MaterialTheme.shapes.small.copy(
+                                bottomStart = CornerSize(0.dp),
+                                bottomEnd = CornerSize(0.dp)
+                            )
+                        )
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .padding(vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    NameView(
+                        name = selectedContact!!.name,
+                        circleShape = true,
+                        brush = Constants.randomBrush.first(),
+                        modifier = Modifier.size(84.dp)
+                    )
+                    Text(
+                        text = selectedContact!!.name,
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                    if (selectedContact!!.numbers.size == 1) {
+                        Text(
+                            text = selectedContact!!.numbers.first(),
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier
+                                .alpha(0.6f)
+                                .padding(top = 8.dp)
+                        )
+                    } else {
+                        Column(modifier = Modifier.padding(top = 8.dp)) {
+                            selectedContact!!.numbers.forEach { number ->
+                                ListItem(
+                                    headlineContent = { Text(text = number) },
+                                    trailingContent = {
+                                        Switch(
+                                            checked = selectedNumbers.contains(number),
+                                            onCheckedChange = null
+                                        )
+                                    },
+                                    modifier = Modifier.toggleable(selectedNumbers.contains(number)) {
+                                        if (it) {
+                                            selectedNumbers.add(number)
+                                        } else {
+                                            selectedNumbers.remove(number)
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            onSend.invoke(selectedContact!!.copy(numbers = selectedNumbers))
+                            sheetContact = false
+                        }, modifier = Modifier
+                            .padding(top = 12.dp)
+                            .padding(horizontal = 12.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Text(text = stringResource(id = R.string.share_contact))
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-fun ContactView(contact: ContactModel, brush: Brush) {
+fun ContactView(contact: ContactModel, brush: Brush, onSend: () -> Unit) {
     ListItem(headlineContent = {
         Text(
             text = contact.name, maxLines = 1, overflow = TextOverflow.Ellipsis
         )
     }, supportingContent = {
         Text(text = contact.numbers.first())
-    }, modifier = Modifier.clickable { }, leadingContent = {
+    }, modifier = Modifier.clickable { onSend.invoke() }, leadingContent = {
         NameView(name = contact.name, circleShape = true, brush = brush)
     })
 }

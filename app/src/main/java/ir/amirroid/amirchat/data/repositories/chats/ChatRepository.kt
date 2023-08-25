@@ -22,6 +22,8 @@ import ir.amirroid.amirchat.utils.getType
 import ir.amirroid.amirchat.utils.id
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
@@ -37,8 +39,11 @@ class ChatRepository @Inject constructor(
     private val chats = database.child(Constants.CHATS)
     private val chatStorage = storage.child(Constants.CHATS)
 
+
+    private val job = Job()
+    private val scope = CoroutineScope(job)
+
     fun observeToRooms(
-        scope: CoroutineScope,
         onReceive: (List<ChatRoom>) -> Unit
     ) {
         scope.launch(Dispatchers.IO) {
@@ -131,6 +136,9 @@ class ChatRepository @Inject constructor(
     }
 
     fun observeToChat(room: String, onChat: (List<MessageModel>) -> Unit) {
+        scope.launch {
+            localData.collectToChatsFromRoom(room, onChat)
+        }
         chats.orderByChild("chatRoom").equalTo(room)
             .addValueEventListener(object : ValueEventListener {
                 override fun onCancelled(error: DatabaseError) = Unit
@@ -138,7 +146,12 @@ class ChatRepository @Inject constructor(
                     snapshot.children.map {
                         it.getValue(MessageModel::class.java) ?: MessageModel()
                     }
-                        .let { onChat.invoke(it) }
+                        .let {
+                            scope.launch {
+                                localData.setChatsFromRoom(room, it)
+                            }
+                            onChat.invoke(it)
+                        }
                 }
             })
     }
@@ -156,28 +169,32 @@ class ChatRepository @Inject constructor(
             List<FileMessage>
         ) -> Unit
     ) {
-        val links = mutableListOf<FileMessage>()
-        if (list.isNotEmpty()) {
-            list.forEachIndexed { index, file ->
-                val name = System.currentTimeMillis().toString() + file.path.split("/").last()
-                val ref = chatStorage.child(name)
-                ref.putFile(File(file.path).toUri()).addOnSuccessListener {
-                    ref.downloadUrl.addOnSuccessListener { link ->
-                        val fileMessage = file.copy(path = link.toString())
-                        links.add(fileMessage)
+        if (list.firstOrNull()?.type == Constants.CONTACT) {
+            onEnd.invoke(list)
+        } else {
+            val links = mutableListOf<FileMessage>()
+            if (list.isNotEmpty()) {
+                list.forEachIndexed { index, file ->
+                    val name = System.currentTimeMillis().toString() + file.path.split("/").last()
+                    val ref = chatStorage.child(name)
+                    ref.putFile(File(file.path).toUri()).addOnSuccessListener {
+                        ref.downloadUrl.addOnSuccessListener { link ->
+                            val fileMessage = file.copy(path = link.toString())
+                            links.add(fileMessage)
+                            if (index == list.size.minus(1)) {
+                                onEnd.invoke(links)
+                            }
+                        }
+                    }.addOnFailureListener {
+                        Log.d("DSf", "addFiles: ${it.localizedMessage}")
                         if (index == list.size.minus(1)) {
                             onEnd.invoke(links)
                         }
                     }
-                }.addOnFailureListener {
-                    Log.d("DSf", "addFiles: ${it.localizedMessage}")
-                    if (index == list.size.minus(1)) {
-                        onEnd.invoke(links)
-                    }
                 }
+            } else {
+                onEnd.invoke(links)
             }
-        } else {
-            onEnd.invoke(links)
         }
     }
 
@@ -190,5 +207,17 @@ class ChatRepository @Inject constructor(
                     snapshot.ref.removeValue()
                 }
             })
+        scope.launch {
+            localData.deleteRoom(room)
+            localData.deleteChats(room.id)
+        }
+    }
+
+    fun onDestroy() {
+        try {
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }

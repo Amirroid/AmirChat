@@ -44,6 +44,8 @@ class ChatViewModel @Inject constructor(
     private val _chats = MutableStateFlow<List<MessageModel>>(emptyList())
     val chats = _chats.asStateFlow()
 
+    val reply = MutableStateFlow<String?>(null)
+
 
     private val _room = MutableStateFlow<ChatRoom?>(null)
 
@@ -125,7 +127,8 @@ class ChatViewModel @Inject constructor(
                 from = CurrentUser.token.toString(),
                 chatRoom = _room.value?.id ?: "",
                 files = files,
-                status = Constants.SEND
+                status = Constants.SEND,
+                replyToId = reply.value
             )
         )
     }
@@ -238,6 +241,30 @@ class ChatViewModel @Inject constructor(
 
     fun seekTo(seek: Long) {
         musicHelper.seekTo(seek)
+    }
+
+    fun playOrPauseMusicWithCache(file: FileMessage, mySend: Boolean, calculateTime: Boolean) {
+        if (file.path == _currentMusic.value.toString()) {
+            musicHelper.pause()
+            _currentMusic.value = null
+        } else {
+            if (mySend && File(file.fromPath).exists()) {
+                if (preViewsPlayingMusic.toString() == file.path) {
+                    musicHelper.play()
+                } else {
+                    musicHelper.playWithOutNotification(file.fromPath.toUri())
+                }
+            } else {
+                if (preViewsPlayingMusic.toString() == file.path) {
+                    musicHelper.play()
+                } else {
+                    musicHelper.playWithCache(file.path)
+                }
+            }
+            _currentMusic.value = file.path.toUri()
+            preViewsPlayingMusic = file.path.toUri()
+            if (calculateTime) calculateTimeForPlayingMusic()
+        }
     }
 
 }

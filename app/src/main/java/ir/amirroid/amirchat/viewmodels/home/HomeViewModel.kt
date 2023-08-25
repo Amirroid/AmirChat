@@ -32,12 +32,12 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun observeToRooms() {
-        chatRepository.observeToRooms(viewModelScope) {
+        chatRepository.observeToRooms {
             _rooms.value = it
         }
     }
 
-    fun deleteRoom(room:ChatRoom) {
+    fun deleteRoom(room: ChatRoom) {
         chatRepository.deleteRoom(room)
     }
 }

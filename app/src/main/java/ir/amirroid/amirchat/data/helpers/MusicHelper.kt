@@ -1,9 +1,11 @@
 package ir.amirroid.amirchat.data.helpers
 
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ConcatenatingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -16,7 +18,8 @@ import javax.inject.Singleton
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class MusicHelper @Inject constructor(
     private val exoPlayer: ExoPlayer,
-    private val dataSource: DefaultDataSource.Factory
+    private val dataSource: DefaultDataSource.Factory,
+    private val cacheDataSource: CacheDataSource.Factory
 ) {
     var onEvent: ((Int) -> Unit)? = null
     private val listener = object : Player.Listener {
@@ -85,4 +88,12 @@ class MusicHelper @Inject constructor(
     }
 
     fun getPosition() = exoPlayer.currentPosition
+    fun playWithCache(path: String) {
+        exoPlayer.setMediaSource(
+            ProgressiveMediaSource.Factory(cacheDataSource).createMediaSource(MediaItem.fromUri(path.toUri()))
+        )
+        exoPlayer.playWhenReady = true
+        exoPlayer.prepare()
+        exoPlayer.play()
+    }
 }
