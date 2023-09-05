@@ -130,9 +130,13 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
     var popUpChat by remember {
         mutableStateOf(Offset.Zero)
     }
+    var selectedMessage by remember {
+        mutableStateOf<MessageModel?>(null)
+    }
     var filePopupShow by remember {
         mutableStateOf(false)
     }
+    val selectedList by viewModel.selectedList.collectAsStateWithLifecycle()
     val replyId by viewModel.reply.collectAsStateWithLifecycle()
     var popUpMedia by remember {
         mutableStateOf<Pair<MessageModel, FileMessage>?>(null)
@@ -153,6 +157,7 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
     val showRecordPreview by viewModel.showRecordPreview.collectAsStateWithLifecycle()
     val currentPathRecording by viewModel.currentRecordingPath.collectAsStateWithLifecycle()
     val currentMusic by viewModel.currentMusic.collectAsStateWithLifecycle()
+    val currentRoom by viewModel.room.collectAsStateWithLifecycle()
     DisposableEffect(key1 = Unit) {
         viewModel.observeToChats(room, user)
         onDispose { focusManager.clearFocus() }
@@ -192,8 +197,22 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                         onRecord = { viewModel.requestRecord() }, onFileRequest = {
                             viewModel.getMedias()
                             filePopupShow = true
+                        }, onSendFile = { files ->
+                            viewModel.reply.value = null
+                            viewModel.setMessages(
+                                messages.toMutableList().apply {
+                                    add(
+                                        MessageModel(
+                                            "",
+                                            from = CurrentUser.token ?: "",
+                                            replyToId = replyId,
+                                            files = files
+                                        )
+                                    )
+                                }
+                            )
+                            viewModel.addMessage("", files)
                         }) { text ->
-                        focusManager.clearFocus()
                         viewModel.reply.value = null
                         viewModel.setMessages(
                             messages.toMutableList().apply {
@@ -207,9 +226,6 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                             }
                         )
                         viewModel.addMessage(text)
-                        scope.launch {
-                            lazyState.animateScrollToItem(messages.size)
-                        }
                     }
                 }
             }
@@ -249,7 +265,6 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
             modifier = Modifier.padding(paddingValues),
             lazyState = lazyState,
             messages = messages,
-            onClick = { popUpChat = it },
             onContentClick = { offset, size, pair ->
                 when (pair.second.type) {
                     Constants.GALLERY -> {
@@ -269,24 +284,62 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                 }
             }, playingMusic = currentMusic ?: Uri.EMPTY,
             currentPosition = currentTimePlayingAudio,
+            selectedList = selectedList,
             onMessageEvent = {
                 when (it) {
                     is MessageEvents.SeekExo -> {
                         viewModel.seekTo(it.position)
                     }
 
+                    is MessageEvents.SetEmoji -> {
+                        viewModel.setEmoji(it.messageModel, it.emoji)
+                    }
+
                     is MessageEvents.Reply -> {
                         viewModel.reply.value = it.id
+                    }
+
+                    is MessageEvents.Click -> {
+                        popUpChat = it.offset
+                        selectedMessage = it.messageModel
+                    }
+
+                    is MessageEvents.LongClick -> {
+                        try {
+                            if (selectedList.contains(it.messageModel)) {
+                                viewModel.selectedList.value = selectedList.toMutableList().apply {
+                                    remove(it.messageModel)
+                                }
+                            } else {
+                                viewModel.selectedList.value = selectedList.toMutableList().apply {
+                                    add(it.messageModel)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     }
                 }
             },
             to = user
-        ) {
-
-        }
+        )
     }
-    MessagePopUp(offset = popUpChat, context, popUpChat != Offset.Zero) {
+    MessagePopUp(
+        offset = popUpChat,
+        context,
+        popUpChat != Offset.Zero,
+        selectedMessage,
+        myFrom = CurrentUser.token == currentRoom?.from?.token,
+        onDismissRequest = {
+            popUpChat = Offset.Zero
+        }) {
         popUpChat = Offset.Zero
+        selectedMessage = if (CurrentUser.token == currentRoom?.from?.token){
+            selectedMessage?.copy(fromEmoji = it)
+        }else{
+            selectedMessage?.copy(toEmoji = it)
+        }
+        viewModel.setEmoji(selectedMessage, it)
     }
     FileSelectorBottomSheet(show = filePopupShow, viewModel = viewModel, onDismissRequest = {
         filePopupShow = false
@@ -325,6 +378,7 @@ fun TextFieldChat(
     replyMessage: MessageModel?,
     user: UserModel,
     onReplyCancel: () -> Unit,
+    onSendFile: (List<FileMessage>) -> Unit,
     onRecord: () -> Unit, onFileRequest: () -> Unit, onSend: (String) -> Unit
 ) {
     var text by remember {
@@ -436,6 +490,17 @@ fun TextFieldChat(
                     .animateContentSize()
                     .heightIn(64.dp, 200.dp),
                 showKeyboard = showKeyboard,
+                onSendSticker = {
+                    onSendFile.invoke(
+                        listOf(
+                            FileMessage(
+                                it.toString(),
+                                it.toString(),
+                                type = Constants.STICKER
+                            )
+                        )
+                    )
+                },
                 onFocusChanged = {
                     showKeyboard = it
                     if (it) showEmojiKeyboard = false

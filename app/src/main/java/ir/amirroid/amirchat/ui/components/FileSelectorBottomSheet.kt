@@ -141,10 +141,12 @@ import com.google.gson.Gson
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.rememberCameraPositionState
 import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.models.chat.FileMessage
 import ir.amirroid.amirchat.data.models.media.ContactModel
 import ir.amirroid.amirchat.data.models.media.FileModel
+import ir.amirroid.amirchat.data.models.media.Location
 import ir.amirroid.amirchat.data.models.media.MediaModel
 import ir.amirroid.amirchat.data.models.media.MusicModel
 import ir.amirroid.amirchat.utils.Constants
@@ -220,6 +222,7 @@ fun FileSelectorBottomSheet(
         initialSize = initialSize.value,
         show = show,
         onDismissRequest = onDismissRequest,
+        enabled = currentType != location,
         bottomBarContent = {
             AnimatedVisibility(
                 visible = show && selectedItems.isNotEmpty(),
@@ -377,7 +380,10 @@ fun FileSelectorBottomSheet(
                 }
 
                 location -> {
-                    LocationView(context)
+                    LocationView(context) { location ->
+                        onSend.invoke("", listOf(location))
+                        onDismissRequest.invoke()
+                    }
                 }
 
                 files -> {
@@ -405,7 +411,7 @@ fun FileSelectorBottomSheet(
                 musics -> {
                     viewModel.getMusics()
                     MusicsView(
-                        context, viewModel.musics, viewModel.currentMusic, selectedItems
+                        viewModel.musics, viewModel.currentMusic, selectedItems
                     ) { uri, play ->
                         viewModel.playOrPauseMusic(play, uri)
                     }
@@ -418,7 +424,6 @@ fun FileSelectorBottomSheet(
 
 @Composable
 fun MusicsView(
-    context: Context,
     musics: StateFlow<List<MusicModel>>,
     currentPlayingMusic: StateFlow<Uri?>,
     selectedItems: SnapshotStateList<String>,
@@ -761,44 +766,63 @@ fun FileView(file: FileModel, selected: Boolean, context: Context, onSelect: (Bo
 }
 
 @Composable
-fun LocationView(context: Context) {
+fun LocationView(context: Context, onSend: (FileMessage) -> Unit) {
+    val camera = rememberCameraPositionState()
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        GoogleMap(
+        Box(
             modifier = Modifier
                 .padding(top = 12.dp)
                 .padding(horizontal = 12.dp)
                 .fillMaxWidth()
                 .height(200.dp)
                 .clip(MaterialTheme.shapes.small),
-            properties = MapProperties(
-                isMyLocationEnabled = true,
-                mapStyleOptions = if (isSystemInDarkTheme()) MapStyleOptions.loadRawResourceStyle(
-                    context, R.raw.dark_map
-                ) else null
-            ),
-            uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = true)
+            contentAlignment = Alignment.Center
         ) {
+            GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                properties = MapProperties(
+                    isMyLocationEnabled = true,
+                    mapStyleOptions = if (isSystemInDarkTheme()) MapStyleOptions.loadRawResourceStyle(
+                        context, R.raw.dark_map
+                    ) else null
+                ),
+                uiSettings = MapUiSettings(
+                    zoomControlsEnabled = false,
+                    myLocationButtonEnabled = true
+                ),
+                cameraPositionState = camera
+            ) {
 
+            }
+            Icon(
+                painter = painterResource(id = R.drawable.baseline_location_on_24),
+                contentDescription = null,
+                tint = Color.Red,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
         }
         ListItem(headlineContent = { Text(text = stringResource(id = R.string.send_location)) },
             modifier = Modifier
                 .padding(top = 12.dp)
-                .clickable { },
+                .clickable {
+                    onSend.invoke(
+                        FileMessage(
+                            type = Constants.LOCATION,
+                            data = Gson().toJson(
+                                Location(
+                                    camera.position.zoom,
+                                    camera.position.target.latitude,
+                                    camera.position.target.longitude,
+                                )
+                            )
+                        )
+                    )
+                },
             leadingContent = {
                 IconButton(onClick = {}) {
                     Icon(imageVector = Icons.Rounded.LocationOn, contentDescription = null)
-                }
-            })
-        Divider(thickness = 4.dp)
-        ListItem(headlineContent = { Text(text = stringResource(id = R.string.send_my_location)) },
-            modifier = Modifier
-                .padding(top = 8.dp)
-                .clickable { },
-            leadingContent = {
-                IconButton(onClick = {}) {
-                    Icon(imageVector = Icons.Rounded.Person, contentDescription = null)
                 }
             })
     }

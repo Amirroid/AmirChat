@@ -57,5 +57,9 @@ object NetModule {
     @Singleton
     fun provideDatabase(
         firebase: Firebase
-    ) = firebase.database.reference
+    ) = firebase.database.apply {
+        setPersistenceEnabled(true)
+    }.reference.apply {
+        keepSynced(true)
+    }
 }

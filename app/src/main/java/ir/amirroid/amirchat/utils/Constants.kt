@@ -22,6 +22,7 @@ object Constants {
     const val LOCATION = 3
     const val CONTACT = 4
     const val MUSIC = 5
+    const val STICKER = 6
 
 
     // pages
@@ -49,6 +50,7 @@ object Constants {
 
 
     val listMessageEmoji = listOf(
+        getEmoji(0X1F44D),
         getEmoji(0X1F601),
         getEmoji(0X1F602),
         getEmoji(0X1F603),

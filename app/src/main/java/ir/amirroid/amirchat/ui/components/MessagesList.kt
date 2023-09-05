@@ -50,12 +50,11 @@ fun MessagesList(
     showPattern: Boolean = true,
     replyEnabled: Boolean = true,
     to: UserModel,
-    onClick: (Offset) -> Unit,
     onContentClick: ((Offset, Size, Pair<MessageModel, FileMessage>) -> Unit)? = null,
     onMessageEvent: ((MessageEvents) -> Unit)? = null,
     currentPosition: Long? = null,
     playingMusic: Uri = Uri.EMPTY,
-    onLongClick: () -> Unit
+    selectedList: List<MessageModel> = emptyList(),
 ) {
     val context = LocalContext.current
     val configuration = context.resources.configuration
@@ -100,14 +99,14 @@ fun MessagesList(
                         message,
                         message.from == CurrentUser.token,
                         replyEnabled,
-                        onClick,
-                        onLongClick,
                         playingMusic,
                         onMessageEvent = onMessageEvent,
                         currentPosition = if (message.files.firstOrNull()?.type == Constants.MUSIC) currentPosition else null,
                         onContentClick = onContentClick,
                         if (message.replyToId == null) null else messages.firstOrNull { user -> user.id == message.replyToId },
-                        to
+                        selectedList.contains(message),
+                        to,
+                        selectedList.isNotEmpty()
                     )
 //                    if (animatedList.contains(message).not()) {
 //                        LaunchedEffect(Unit) {

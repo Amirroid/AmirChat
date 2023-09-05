@@ -44,6 +44,7 @@ fun StickerTextField(
     context: Context = LocalContext.current,
     modifier: Modifier = Modifier,
     maxHeight: Float = 200.toDp(context),
+    onSendSticker : (Uri) -> Unit,
     onFocusChanged: (Boolean) -> Unit
 ) {
     val textColor = MaterialTheme.colorScheme.onBackground
@@ -64,7 +65,9 @@ fun StickerTextField(
                         "image/gif",
                     )
                 )
-                val callback = stickerCallback { }
+                val callback = stickerCallback {
+                    onSendSticker.invoke(it)
+                }
                 return InputConnectionCompat.createWrapper(connection, outAttrs, callback)
             }
         }
@@ -136,7 +139,7 @@ fun stickerCallback(onCallBack: (Uri) -> Unit) =
             inputContentInfo.releasePermission()
         } catch (_: Exception) {
         }
-        val uri = inputContentInfo.contentUri
+        val uri = inputContentInfo.linkUri ?: Uri.EMPTY
         onCallBack.invoke(uri)
         true
     }

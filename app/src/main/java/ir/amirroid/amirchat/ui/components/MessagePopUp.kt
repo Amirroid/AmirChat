@@ -29,6 +29,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
@@ -53,6 +54,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.models.chat.MessageModel
+import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.utils.Constants
 import ir.amirroid.amirchat.utils.toDp
 import ir.amirroid.amirchat.utils.toIntOffset
@@ -63,7 +66,10 @@ fun MessagePopUp(
     offset: Offset,
     context: Context,
     visible: Boolean,
-    onDismissRequest: () -> Unit
+    selectedMessage: MessageModel?,
+    myFrom: Boolean,
+    onDismissRequest: () -> Unit,
+    onSelect: (String?) -> Unit
 ) {
     val height = context.resources.displayMetrics.heightPixels
     val dpPadding = 78.toDp(context)
@@ -128,14 +134,29 @@ fun MessagePopUp(
                         contentPadding = PaddingValues(horizontal = 12.dp)
                     ) {
                         items(emoji.size) {
+                            val thisEmoji = emoji[it]
+                            val selected = if (myFrom) {
+                                selectedMessage?.fromEmoji == thisEmoji
+                            } else {
+                                selectedMessage?.toEmoji == thisEmoji
+                            }
                             AnimatedVisibility(
                                 visible = true,
                                 initiallyVisible = false,
                                 enter = scaleIn(),
                                 exit = scaleOut()
                             ) {
-                                IconButton(onClick = {}) {
-                                    Text(text = emoji[it], fontSize = 28.sp)
+                                IconButton(
+                                    onClick = {
+                                        onSelect.invoke(if (selected) null else thisEmoji)
+                                    },
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(
+                                            0.6f
+                                        ) else Color.Transparent
+                                    )
+                                ) {
+                                    Text(text = thisEmoji, fontSize = 28.sp)
                                 }
                             }
                         }

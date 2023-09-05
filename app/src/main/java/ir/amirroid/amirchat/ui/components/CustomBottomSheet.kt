@@ -66,6 +66,7 @@ fun CustomModalBottomSheet(
     showToolbar: Boolean,
     scope: CoroutineScope,
     onDismissRequest: () -> Unit,
+    enabled: Boolean = true,
     bottomBarContent: @Composable (Boolean) -> Unit,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -154,7 +155,7 @@ fun CustomModalBottomSheet(
                                 }
                             }
                         }
-                    })
+                    }, enabled = enabled)
                     .offset {
                         IntOffset(0, currentOffset.value.toInt())
                     }

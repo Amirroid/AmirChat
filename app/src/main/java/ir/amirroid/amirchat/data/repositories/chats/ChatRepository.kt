@@ -58,21 +58,20 @@ class ChatRepository @Inject constructor(
                 }
             }
         }
-        rooms
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    snapshot.children.map { it.getValue(ChatRoom::class.java) ?: return }.apply {
-                        val list =
-                            filter { it.from.token == CurrentUser.token || it.to.token == CurrentUser.token }
-                        scope.launch(Dispatchers.IO) { localData.setRooms(Gson().toJson(list)) }
-                        onReceive.invoke(list)
-                    }
+        rooms.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                snapshot.children.map { it.getValue(ChatRoom::class.java) ?: return }.apply {
+                    val list =
+                        filter { it.from.token == CurrentUser.token || it.to.token == CurrentUser.token }
+                    scope.launch(Dispatchers.IO) { localData.setRooms(Gson().toJson(list)) }
+                    onReceive.invoke(list)
                 }
+            }
 
-                override fun onCancelled(error: DatabaseError) {
-                    error.toException().printStackTrace()
-                }
-            })
+            override fun onCancelled(error: DatabaseError) {
+                error.toException().printStackTrace()
+            }
+        })
     }
 
     fun addRoom(
@@ -93,8 +92,7 @@ class ChatRepository @Inject constructor(
 
 
     fun addRoomWithUser(
-        user: UserModel,
-        onComplete: (room: ChatRoom) -> Unit
+        user: UserModel, onComplete: (room: ChatRoom) -> Unit
     ) {
         rooms.child(CurrentUser.token + "-" + user.token)
             .addListenerForSingleValueEvent(object : ValueEventListener {
@@ -145,13 +143,12 @@ class ChatRepository @Inject constructor(
                 override fun onDataChange(snapshot: DataSnapshot) {
                     snapshot.children.map {
                         it.getValue(MessageModel::class.java) ?: MessageModel()
-                    }
-                        .let {
-                            scope.launch {
-                                localData.setChatsFromRoom(room, it)
-                            }
-                            onChat.invoke(it)
+                    }.let {
+                        scope.launch {
+                            localData.setChatsFromRoom(room, it)
                         }
+                        onChat.invoke(it)
+                    }
                 }
             })
     }
@@ -159,7 +156,7 @@ class ChatRepository @Inject constructor(
     fun addMessage(message: MessageModel) {
         addFiles(message.files) {
             chats.child(
-                System.currentTimeMillis().toString() + message.chatRoom
+                message.id
             ).setValue(message.copy(files = it))
         }
     }
@@ -169,12 +166,13 @@ class ChatRepository @Inject constructor(
             List<FileMessage>
         ) -> Unit
     ) {
-        if (list.firstOrNull()?.type == Constants.CONTACT) {
+        if (list.firstOrNull()?.type == Constants.CONTACT || list.firstOrNull()?.type == Constants.LOCATION || list.firstOrNull()?.type == Constants.STICKER) {
             onEnd.invoke(list)
         } else {
             val links = mutableListOf<FileMessage>()
             if (list.isNotEmpty()) {
                 list.forEachIndexed { index, file ->
+                    Log.d("DSf", "addFiles: ${file.path}")
                     val name = System.currentTimeMillis().toString() + file.path.split("/").last()
                     val ref = chatStorage.child(name)
                     ref.putFile(File(file.path).toUri()).addOnSuccessListener {
@@ -204,13 +202,14 @@ class ChatRepository @Inject constructor(
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onCancelled(error: DatabaseError) = Unit
                 override fun onDataChange(snapshot: DataSnapshot) {
-                    snapshot.ref.removeValue()
+                    snapshot.ref.removeValue().addOnSuccessListener {
+                        scope.launch {
+                            localData.deleteRoom(room)
+                            localData.deleteChats(room.id)
+                        }
+                    }
                 }
             })
-        scope.launch {
-            localData.deleteRoom(room)
-            localData.deleteChats(room.id)
-        }
     }
 
     fun onDestroy() {
@@ -218,6 +217,21 @@ class ChatRepository @Inject constructor(
 
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    fun setEmoji(id: String, emoji: String?, from: Boolean) {
+        chats.child(id).apply {
+            if (from) {
+                child(
+                    "fromEmoji"
+                ).setValue(emoji)
+            } else {
+
+                child(
+                    "toEmoji"
+                ).setValue(emoji)
+            }
         }
     }
 }

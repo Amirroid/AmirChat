@@ -46,8 +46,11 @@ class ChatViewModel @Inject constructor(
 
     val reply = MutableStateFlow<String?>(null)
 
+    val selectedList = MutableStateFlow(emptyList<MessageModel>())
+
 
     private val _room = MutableStateFlow<ChatRoom?>(null)
+    val room = _room.asStateFlow()
 
     private val _medias = MutableStateFlow<List<MediaModel>>(emptyList())
     val medias = _medias.asStateFlow()
@@ -128,7 +131,7 @@ class ChatViewModel @Inject constructor(
                 chatRoom = _room.value?.id ?: "",
                 files = files,
                 status = Constants.SEND,
-                replyToId = reply.value
+                replyToId = reply.value,
             )
         )
     }
@@ -265,6 +268,15 @@ class ChatViewModel @Inject constructor(
             preViewsPlayingMusic = file.path.toUri()
             if (calculateTime) calculateTimeForPlayingMusic()
         }
+    }
+
+    fun setEmoji(selectedMessage: MessageModel?, message: String?) {
+        val isFrom = _room.value?.from?.token == CurrentUser.token
+        chatRepository.setEmoji(
+            selectedMessage?.id ?: "",
+            message,
+            isFrom
+        )
     }
 
 }

@@ -6,17 +6,23 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
+import android.os.Build.VERSION.SDK_INT
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateSizeAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +70,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -81,17 +88,31 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
+import coil.ImageLoader
 import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import coil.request.CachePolicy
 import coil.request.ImageRequest
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.gson.Gson
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.rememberCameraPositionState
 import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.events.MessageEvents
 import ir.amirroid.amirchat.data.models.chat.FileMessage
 import ir.amirroid.amirchat.data.models.chat.MessageModel
 import ir.amirroid.amirchat.data.models.media.ContactModel
+import ir.amirroid.amirchat.data.models.media.Location
 import ir.amirroid.amirchat.data.models.media.MusicModelForJson
 import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
@@ -99,6 +120,7 @@ import ir.amirroid.amirchat.utils.Constants
 import ir.amirroid.amirchat.utils.formatTime
 import ir.amirroid.amirchat.utils.formatTimeHourMinute
 import ir.amirroid.amirchat.utils.getColorOfMessage
+import ir.amirroid.amirchat.utils.getEmoji
 import ir.amirroid.amirchat.utils.getName
 import ir.amirroid.amirchat.utils.getShapeOfMessage
 import ir.amirroid.amirchat.utils.getTextColorOfMessage
@@ -112,31 +134,100 @@ fun MessageView(
     message: MessageModel,
     isMyUser: Boolean,
     replyEnabled: Boolean = true,
-    onClick: (Offset) -> Unit,
-    onLongClick: () -> Unit,
     playingMusic: Uri,
     onMessageEvent: ((MessageEvents) -> Unit)? = null,
     currentPosition: Long? = null,
     onContentClick: ((Offset, Size, Pair<MessageModel, FileMessage>) -> Unit)? = null,
     replyMessage: MessageModel?,
-    to: UserModel
+    selected: Boolean,
+    to: UserModel,
+    selectionMode: Boolean
 ) {
-    SwipeBox(paddingEnd = if (isMyUser) 0.dp else 12.dp, enabled = replyEnabled, onReplyRequest = {
-        onMessageEvent?.invoke(MessageEvents.Reply(message.id))
-    }) {
-        MessageView(
-            message = message,
-            maxWidth = maxWidth,
-            isMyUser,
-            onClick,
-            onLongClick,
-            playingMusic,
-            currentPosition,
-            onContentClick,
-            onMessageEvent,
-            replyMessage,
-            to
-        )
+    val context = LocalContext.current
+    var size by remember {
+        mutableFloatStateOf(0f)
+    }
+    var lastOffset by remember {
+        mutableStateOf(Offset.Zero)
+    }
+    val selectionSize = remember {
+        Animatable(0f)
+    }
+    var position by remember {
+        mutableStateOf(Offset.Zero)
+    }
+    LaunchedEffect(key1 = selected) {
+        if (selected) {
+            selectionSize.animateTo(size * 2, tween(500))
+        } else {
+            selectionSize.animateTo(0f, tween(500))
+        }
+    }
+    val selectedColor = MaterialTheme.colorScheme.primaryContainer.copy(0.3f)
+    Box(modifier = Modifier
+        .fillMaxWidth()
+        .onGloballyPositioned {
+            size = maxOf(it.size.width, it.size.height).toFloat()
+            position = it.positionInWindow()
+        }
+        .pointerInput(selected, selectionMode, position, message) {
+            detectTapGestures(onLongPress = {
+                lastOffset = it
+                onMessageEvent?.invoke(MessageEvents.LongClick(message))
+            }, onTap = {
+                if (selectionMode) {
+                    lastOffset = it
+                    onMessageEvent?.invoke(MessageEvents.LongClick(message))
+                } else {
+                    onMessageEvent?.invoke(MessageEvents.Click(message, position))
+                }
+            }, onDoubleTap = {
+                onMessageEvent?.invoke(MessageEvents.SetEmoji(message, getEmoji(0X1F44D)))
+            })
+        }
+        .drawWithContent {
+            clipRect {
+                drawCircle(selectedColor, radius = selectionSize.value, lastOffset)
+            }
+            drawContent()
+        }) {
+        SwipeBox(
+            paddingEnd = if (isMyUser) 0.dp else 12.dp,
+            enabled = replyEnabled,
+            onReplyRequest = {
+                onMessageEvent?.invoke(MessageEvents.Reply(message.id))
+            }) {
+            if (message.files.firstOrNull()?.type == Constants.STICKER) {
+                Image(
+                    painter = rememberAsyncImagePainter(
+                        model = ImageRequest.Builder(context).data(message.files.first()).build(),
+                        imageLoader = ImageLoader.Builder(context)
+                            .allowHardware(true)
+                            .components {
+                                if (SDK_INT >= 28) {
+                                    add(ImageDecoderDecoder.Factory())
+                                } else {
+                                    add(GifDecoder.Factory())
+                                }
+                            }.build()
+                    ),
+                    contentDescription = null,
+                    modifier = Modifier.size(200.dp)
+                )
+            } else {
+                MessageView(
+                    message = message,
+                    maxWidth = maxWidth,
+                    isMyUser,
+                    playingMusic,
+                    currentPosition,
+                    onContentClick,
+                    onMessageEvent,
+                    replyMessage,
+                    to
+                )
+            }
+        }
     }
 }
 
@@ -146,8 +237,6 @@ fun RowScope.MessageView(
     message: MessageModel,
     maxWidth: Dp,
     isMyUser: Boolean,
-    onClick: (Offset) -> Unit,
-    onLongClick: () -> Unit,
     playingMusic: Uri,
     currentPosition: Long? = null,
     onContentClick: ((Offset, Size, Pair<MessageModel, FileMessage>) -> Unit)? = null,
@@ -155,17 +244,9 @@ fun RowScope.MessageView(
     replyMessage: MessageModel?,
     to: UserModel
 ) {
-    var position by remember {
-        mutableStateOf(Offset.Zero)
-    }
     Box(
         modifier = Modifier
-            .weight(1f)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { onClick.invoke(position) },
-                    onLongPress = { onLongClick.invoke() })
-            },
+            .weight(1f),
         contentAlignment = if (isMyUser) Alignment.CenterEnd else Alignment.CenterStart
     ) {
         Column(
@@ -178,9 +259,6 @@ fun RowScope.MessageView(
                     getShapeOfMessage(isMyUser)
                 )
                 .background(getColorOfMessage(isMyUser = isMyUser))
-                .onPlaced {
-                    position = it.positionInWindow()
-                }
         ) {
             if (replyMessage != null) {
                 val name = if (replyMessage.from == CurrentUser.token) {
@@ -208,9 +286,11 @@ fun RowScope.MessageView(
                                     .height(with(density) { sizeBox.toDp() } - 12.dp)
                                     .width(4.dp)
                             )
-                            Column(modifier = Modifier.onSizeChanged {
-                                sizeBox = it.height
-                            }.padding(start=8.dp)) {
+                            Column(modifier = Modifier
+                                .onSizeChanged {
+                                    sizeBox = it.height
+                                }
+                                .padding(start = 8.dp)) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = name,
@@ -256,6 +336,83 @@ fun RowScope.MessageView(
                             modifier = Modifier,
                             color = getTextColorOfMessage(isMyUser = isMyUser)
                         )
+                    }
+                }
+                if (message.fromEmoji != null || message.toEmoji != null) {
+                    Row(modifier = Modifier.padding(top = 4.dp)) {
+                        val fromUser = message.chatRoom.split("-").first() == CurrentUser.token
+                        val toUser = message.chatRoom.split("-").last() == CurrentUser.token
+                        if (message.fromEmoji != null) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (fromUser) MaterialTheme.colorScheme.inversePrimary else MaterialTheme.colorScheme.primaryContainer
+                                    )
+                                    .wrapContentSize()
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clickable {
+                                            if (fromUser) {
+                                                onMessageEvent?.invoke(
+                                                    MessageEvents.SetEmoji(
+                                                        message,
+                                                        null
+                                                    )
+                                                )
+                                            }else{
+                                                onMessageEvent?.invoke(
+                                                    MessageEvents.SetEmoji(
+                                                        message,
+                                                        message.fromEmoji
+                                                    )
+                                                )
+                                            }
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(text = message.fromEmoji)
+                                }
+                            }
+                        }
+                        if (message.toEmoji != null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (toUser) MaterialTheme.colorScheme.inversePrimary else MaterialTheme.colorScheme.primaryContainer
+                                    )
+                                    .wrapContentSize(),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clickable {
+                                            if (toUser) {
+                                                onMessageEvent?.invoke(
+                                                    MessageEvents.SetEmoji(
+                                                        message,
+                                                        null
+                                                    )
+                                                )
+                                            }else{
+                                                onMessageEvent?.invoke(
+                                                    MessageEvents.SetEmoji(
+                                                        message,
+                                                        message.toEmoji
+                                                    )
+                                                )
+                                            }
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(text = message.toEmoji)
+                                }
+                            }
+                        }
                     }
                 }
                 Row(
@@ -308,6 +465,60 @@ fun FilesContent(
         Constants.CONTACT -> {
             ContactView(message)
         }
+
+        Constants.LOCATION -> {
+            LocationView(Gson().fromJson(message.files.first().data, Location::class.java))
+        }
+    }
+}
+
+@Composable
+fun LocationView(location: Location) {
+    val camera = rememberCameraPositionState()
+    val context = LocalContext.current
+    LaunchedEffect(key1 = Unit) {
+        camera.move(
+            CameraUpdateFactory.newLatLngZoom(
+                LatLng(location.lat, location.lng),
+                location.zoom
+            )
+        )
+    }
+    Box(
+        modifier = Modifier
+            .padding(4.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .fillMaxWidth()
+            .height(150.dp)
+            .clip(MaterialTheme.shapes.small),
+        contentAlignment = Alignment.Center
+    ) {
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            properties = MapProperties(
+                isMyLocationEnabled = true,
+                mapStyleOptions = if (isSystemInDarkTheme()) MapStyleOptions.loadRawResourceStyle(
+                    context, R.raw.dark_map
+                ) else null,
+            ),
+            uiSettings = MapUiSettings(
+                zoomControlsEnabled = false,
+                myLocationButtonEnabled = false,
+                rotationGesturesEnabled = false,
+                scrollGesturesEnabled = false,
+                scrollGesturesEnabledDuringRotateOrZoom = false,
+                zoomGesturesEnabled = false,
+            ),
+            cameraPositionState = camera
+        ) {
+
+        }
+        Icon(
+            painter = painterResource(id = R.drawable.baseline_location_on_24),
+            contentDescription = null,
+            tint = Color.Red,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
     }
 }
 
@@ -475,6 +686,7 @@ fun GalleryView(message: MessageModel, onContentClick: ((Offset, Size, FileMessa
                 if (message.from == CurrentUser.token) {
                     bitmap = BitmapFactory.decodeFile(files.first().fromPath)
                     ImageRequest.Builder(context).data(files.first().path)
+                        .diskCachePolicy(CachePolicy.ENABLED)
                         .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
                 } else {
                     ImageRequest.Builder(context).data(files.first().path)
@@ -517,6 +729,7 @@ fun GalleryView(message: MessageModel, onContentClick: ((Offset, Size, FileMessa
                             if (message.from == CurrentUser.token) {
                                 bitmap = BitmapFactory.decodeFile(files[index].fromPath)
                                 ImageRequest.Builder(context).data(files[index].path)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
                                     .target { b -> bitmap = (b as BitmapDrawable).bitmap }
                                     .build()
                                 if (files.size.minus(1) >= index.plus(1)) {
@@ -524,6 +737,7 @@ fun GalleryView(message: MessageModel, onContentClick: ((Offset, Size, FileMessa
                                         BitmapFactory.decodeFile(files[index.plus(1)].fromPath)
                                     ImageRequest.Builder(context)
                                         .data(files[index.plus(1)].path)
+                                        .diskCachePolicy(CachePolicy.ENABLED)
                                         .target { b ->
                                             bitmap2 = (b as BitmapDrawable).bitmap
                                         }
@@ -620,7 +834,6 @@ fun SwipeBox(
         if (offsetX.value < -190f && hapticFeedbackDone.not()) {
             hapticFeedbackDone = true
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-            onReplyRequest.invoke()
         } else {
             hapticFeedbackDone = false
         }
@@ -643,6 +856,9 @@ fun SwipeBox(
                 Orientation.Horizontal,
                 onDragStopped = {
                     scope.launch { offsetX.animateTo(0f, animationSpec = spring()) }
+                    if (offsetX.value < -190f && hapticFeedbackDone.not()){
+                        onReplyRequest.invoke()
+                    }
                 },
                 enabled = enabled
             )

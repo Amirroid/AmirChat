@@ -11,4 +11,6 @@ data class MessageModel(
     val chatRoom: String = "",
     val id: String = System.currentTimeMillis().toString() + chatRoom,
     val replyToId: String? = null,
+    val fromEmoji: String? = null,
+    val toEmoji: String? = null,
 )

@@ -77,6 +77,7 @@ dependencies {
 
     // coil
     implementation("io.coil-kt:coil-compose:2.4.0")
+    implementation("io.coil-kt:coil-gif:2.1.0")
 
     // constraint layout
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
@@ -120,9 +121,6 @@ dependencies {
 
     // zxing
     implementation("com.journeyapps:zxing-android-embedded:4.1.0")
-
-    // melli payamak
-    implementation("com.google.code.ksoap2-android:ksoap2-android:3.6.1")
 
     // data store
     implementation("androidx.datastore:datastore-preferences:1.0.0")

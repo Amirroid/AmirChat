@@ -169,11 +169,9 @@ fun ColumnScope.ChatUi() {
             messages = emptyList(),
             showPattern = true,
             replyEnabled = false,
-            onClick = {},
-            to = UserModel()
-        ) {
 
-        }
+            to = UserModel()
+        )
     }
 }
 
