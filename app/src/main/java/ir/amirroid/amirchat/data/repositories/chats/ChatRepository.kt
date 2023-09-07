@@ -234,4 +234,10 @@ class ChatRepository @Inject constructor(
             }
         }
     }
+
+    fun deleteChats(messages: List<MessageModel>) {
+        messages.forEach {
+            chats.child(it.id).removeValue()
+        }
+    }
 }

@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Close
@@ -51,6 +52,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallTopAppBar
@@ -108,8 +110,12 @@ import ir.amirroid.amirchat.ui.components.AudioRecorderField
 import ir.amirroid.amirchat.ui.components.ChatMediaPopUp
 import ir.amirroid.amirchat.ui.components.FileSelectorBottomSheet
 import ir.amirroid.amirchat.ui.components.MessagePopUp
+import ir.amirroid.amirchat.ui.components.MessagePopUpEvent
 import ir.amirroid.amirchat.ui.components.MessagesList
 import ir.amirroid.amirchat.ui.components.StickerTextField
+import ir.amirroid.amirchat.ui.components.TextAnimation
+import ir.amirroid.amirchat.ui.components.TextChangeAnimation
+import ir.amirroid.amirchat.ui.components.TextChangeAnimationCounter
 import ir.amirroid.amirchat.utils.ChatPages
 import ir.amirroid.amirchat.utils.Constants
 import ir.amirroid.amirchat.utils.getName
@@ -119,7 +125,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
-@OptIn(ExperimentalAnimationApi::class)
+@OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
     val viewModel: ChatViewModel = hiltViewModel()
@@ -231,10 +237,58 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
             }
         }
     }, topBar = {
-        AppBarChat(user = user, {
-            navigation.popBackStack()
-        }) {
-            navigation.navigate(ChatPages.ProfileScreen.route)
+        Box {
+            AppBarChat(user = user, {
+                navigation.popBackStack()
+            }) {
+                navigation.navigate(ChatPages.ProfileScreen.route)
+            }
+            AnimatedVisibility(
+                visible = selectedList.isNotEmpty(),
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                SmallTopAppBar(title = {
+                    TextChangeAnimationCounter(
+                        text = selectedList.size.toString(),
+                        style = LocalTextStyle.current
+                    )
+                }, navigationIcon = {
+                    IconButton(onClick = {
+                        viewModel.selectedList.value = emptyList()
+                    }) {
+                        Icon(imageVector = Icons.Rounded.Close, contentDescription = "close")
+                    }
+                },
+                    actions = {
+                        IconButton(onClick = {
+                            viewModel.copyMessages(selectedList)
+                            viewModel.selectedList.value = emptyList()
+                        }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.baseline_content_copy_24),
+                                contentDescription = null
+                            )
+                        }
+                        IconButton(onClick = {
+                            viewModel.selectedList.value = emptyList()
+                        }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_forward),
+                                contentDescription = null
+                            )
+                        }
+                        IconButton(onClick = {
+                            viewModel.deleteMessages(selectedList)
+                            viewModel.selectedList.value = emptyList()
+                        }) {
+                            Icon(
+                                imageVector = Icons.Outlined.Delete,
+                                contentDescription = null
+                            )
+                        }
+                    })
+            }
         }
     }, floatingActionButton = {
         AnimatedVisibility(
@@ -319,6 +373,12 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                             e.printStackTrace()
                         }
                     }
+                    is MessageEvents.CancelDownload -> {
+                        viewModel.cancelDownload(it.path)
+                    }
+                    is MessageEvents.DownloadFile -> {
+                        viewModel.downloadFile(it.path)
+                    }
                 }
             },
             to = user
@@ -330,13 +390,33 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
         popUpChat != Offset.Zero,
         selectedMessage,
         myFrom = CurrentUser.token == currentRoom?.from?.token,
+        onEvent = {
+            when (it) {
+                MessagePopUpEvent.REPLY -> {
+                    viewModel.reply.value = selectedMessage?.id ?: ""
+                }
+
+                MessagePopUpEvent.COPY -> {
+                    viewModel.copyMessages(listOf(selectedMessage ?: MessageModel()))
+                }
+
+                MessagePopUpEvent.DELETE -> {
+                    if (selectedMessage?.id == replyId) {
+                        viewModel.reply.value = null
+                    }
+                    viewModel.deleteMessages(listOf(selectedMessage ?: MessageModel()))
+                }
+            }
+            selectedMessage = null
+            popUpChat = Offset.Zero
+        },
         onDismissRequest = {
             popUpChat = Offset.Zero
         }) {
         popUpChat = Offset.Zero
-        selectedMessage = if (CurrentUser.token == currentRoom?.from?.token){
+        selectedMessage = if (CurrentUser.token == currentRoom?.from?.token) {
             selectedMessage?.copy(fromEmoji = it)
-        }else{
+        } else {
             selectedMessage?.copy(toEmoji = it)
         }
         viewModel.setEmoji(selectedMessage, it)
@@ -417,8 +497,8 @@ fun TextFieldChat(
     ) {
         AnimatedVisibility(
             visible = replyMessage != null,
-            enter = expandVertically(expandFrom = Alignment.Bottom),
-            exit = shrinkVertically(shrinkTowards = Alignment.Bottom)
+            enter = expandVertically(expandFrom = Alignment.Top),
+            exit = shrinkVertically(shrinkTowards = Alignment.Top)
         ) {
             val name = if (replyMessage?.from == CurrentUser.token) {
                 CurrentUser.user?.getName() ?: ""

@@ -1,5 +1,7 @@
 package ir.amirroid.amirchat.viewmodels
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
@@ -8,6 +10,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.ExoPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.helpers.DownloadData
+import ir.amirroid.amirchat.data.helpers.DownloadHelper
+import ir.amirroid.amirchat.data.helpers.DownloadState
 import ir.amirroid.amirchat.data.helpers.MusicHelper
 import ir.amirroid.amirchat.data.helpers.RecorderHelper
 import ir.amirroid.amirchat.data.models.chat.ChatRoom
@@ -38,7 +44,8 @@ class ChatViewModel @Inject constructor(
     private val fileRepository: FileRepository,
     private val musicHelper: MusicHelper,
     private val recorderHelper: RecorderHelper,
-    private val chatRepository: ChatRepository
+    private val chatRepository: ChatRepository,
+    private val downloadHelper: DownloadHelper
 ) : ViewModel() {
 
     private val _chats = MutableStateFlow<List<MessageModel>>(emptyList())
@@ -87,9 +94,15 @@ class ChatViewModel @Inject constructor(
     private val _showRecordPreview = MutableStateFlow(false)
     val showRecordPreview = _showRecordPreview.asStateFlow()
 
+    private lateinit var clipboardManager: ClipboardManager
+
 
     init {
         observeToMusicStates()
+    }
+
+    companion object {
+        val downloadFiles = MutableStateFlow<HashMap<String, DownloadData>>(hashMapOf())
     }
 
     fun observeToChats(
@@ -279,4 +292,34 @@ class ChatViewModel @Inject constructor(
         )
     }
 
+    fun copyMessages(messages: List<MessageModel>) {
+        if (this::clipboardManager.isInitialized.not()) {
+            clipboardManager = context.getSystemService(ClipboardManager::class.java)
+        }
+        var text = ""
+        messages.map { it.message }.forEachIndexed { index, message ->
+            text += message
+            if (index != selectedList.value.size.minus(1)) {
+                text += "\n"
+            }
+        }
+        val clipData = ClipData.newPlainText(context.getString(R.string.app_name), text)
+        clipboardManager.setPrimaryClip(clipData)
+    }
+
+    fun deleteMessages(messages: List<MessageModel>) {
+        chatRepository.deleteChats(messages)
+    }
+
+    fun downloadFile(url: String) {
+        downloadHelper.downloadWithProgress(url) {
+            val newData = downloadFiles.value.apply {
+                this[url] = it
+            }
+            downloadFiles.value = newData
+        }
+    }
+    fun cancelDownload(url:String){
+        downloadHelper.addCancel(url)
+    }
 }

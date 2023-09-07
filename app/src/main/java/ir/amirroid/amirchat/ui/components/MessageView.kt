@@ -7,14 +7,16 @@ import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build.VERSION.SDK_INT
+import android.os.Environment
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateSizeAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.with
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -45,6 +47,9 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowForward
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -75,7 +80,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
@@ -88,10 +92,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
@@ -109,14 +113,18 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.rememberCameraPositionState
 import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.events.MessageEvents
+import ir.amirroid.amirchat.data.helpers.DownloadState
 import ir.amirroid.amirchat.data.models.chat.FileMessage
 import ir.amirroid.amirchat.data.models.chat.MessageModel
 import ir.amirroid.amirchat.data.models.media.ContactModel
+import ir.amirroid.amirchat.data.models.media.FileModel
 import ir.amirroid.amirchat.data.models.media.Location
 import ir.amirroid.amirchat.data.models.media.MusicModelForJson
 import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.utils.Constants
+import ir.amirroid.amirchat.utils.bytesToHumanReadableSize
+import ir.amirroid.amirchat.utils.divIfNotZero
 import ir.amirroid.amirchat.utils.formatTime
 import ir.amirroid.amirchat.utils.formatTimeHourMinute
 import ir.amirroid.amirchat.utils.getColorOfMessage
@@ -125,8 +133,10 @@ import ir.amirroid.amirchat.utils.getName
 import ir.amirroid.amirchat.utils.getShapeOfMessage
 import ir.amirroid.amirchat.utils.getTextColorOfMessage
 import ir.amirroid.amirchat.utils.toDp
+import ir.amirroid.amirchat.viewmodels.ChatViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.io.File
 
 @Composable
 fun MessageView(
@@ -232,6 +242,8 @@ fun MessageView(
 }
 
 
+@OptIn(ExperimentalAnimationApi::class)
+@SuppressLint("UnusedContentLambdaTargetStateParameter")
 @Composable
 fun RowScope.MessageView(
     message: MessageModel,
@@ -338,11 +350,17 @@ fun RowScope.MessageView(
                         )
                     }
                 }
-                if (message.fromEmoji != null || message.toEmoji != null) {
-                    Row(modifier = Modifier.padding(top = 4.dp)) {
-                        val fromUser = message.chatRoom.split("-").first() == CurrentUser.token
-                        val toUser = message.chatRoom.split("-").last() == CurrentUser.token
-                        if (message.fromEmoji != null) {
+
+                Row(modifier = Modifier.padding(top = if (message.fromEmoji != null || message.toEmoji != null) 4.dp else 0.dp)) {
+                    val fromUser = message.chatRoom.split("-").first() == CurrentUser.token
+                    val toUser = message.chatRoom.split("-").last() == CurrentUser.token
+                    AnimatedContent(
+                        targetState = message.fromEmoji,
+                        label = "",
+                        transitionSpec = {
+                            scaleIn() with scaleOut()
+                        }) { emoji ->
+                        if (emoji != null) {
                             Box(
                                 modifier = Modifier
                                     .clip(CircleShape)
@@ -361,7 +379,7 @@ fun RowScope.MessageView(
                                                         null
                                                     )
                                                 )
-                                            }else{
+                                            } else {
                                                 onMessageEvent?.invoke(
                                                     MessageEvents.SetEmoji(
                                                         message,
@@ -373,12 +391,19 @@ fun RowScope.MessageView(
                                         .padding(horizontal = 12.dp, vertical = 4.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(text = message.fromEmoji)
+                                    Text(text = emoji)
                                 }
                             }
                         }
-                        if (message.toEmoji != null) {
-                            Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    AnimatedContent(
+                        targetState = message.toEmoji,
+                        label = "",
+                        transitionSpec = {
+                            scaleIn() with scaleOut()
+                        }) { emoji ->
+                        if (emoji != null) {
                             Box(
                                 modifier = Modifier
                                     .clip(CircleShape)
@@ -397,7 +422,7 @@ fun RowScope.MessageView(
                                                         null
                                                     )
                                                 )
-                                            }else{
+                                            } else {
                                                 onMessageEvent?.invoke(
                                                     MessageEvents.SetEmoji(
                                                         message,
@@ -409,7 +434,7 @@ fun RowScope.MessageView(
                                         .padding(horizontal = 12.dp, vertical = 4.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(text = message.toEmoji)
+                                    Text(text = emoji)
                                 }
                             }
                         }
@@ -468,6 +493,105 @@ fun FilesContent(
 
         Constants.LOCATION -> {
             LocationView(Gson().fromJson(message.files.first().data, Location::class.java))
+        }
+
+        Constants.FILE -> {
+            FilesView(message, onMessageEvent)
+        }
+    }
+}
+
+@Composable
+fun FilesView(message: MessageModel, onMessageEvent: ((MessageEvents) -> Unit)?) {
+    val downloadFiles by ChatViewModel.downloadFiles.collectAsStateWithLifecycle()
+    Column {
+        message.files.forEach { file ->
+            val fileExists = if (message.from == CurrentUser.token) {
+                File(file.fromPath).exists() || File(
+                    Environment.DIRECTORY_DOWNLOADS + File.separator + file.path.split("/").last()
+                ).exists()
+            } else {
+                File(
+                    Environment.DIRECTORY_DOWNLOADS + File.separator + file.path.split("/").last()
+                ).exists()
+            }
+            val fileData = downloadFiles[file.path]
+            val fileInfo = Gson().fromJson(file.data, FileModel::class.java)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp)
+                        .clip(CircleShape)
+                        .clickable {
+                            when {
+                                fileExists -> {
+
+                                }
+
+                                fileData == null -> {
+                                    onMessageEvent?.invoke(MessageEvents.DownloadFile(file.path))
+                                }
+
+                                fileData.state == DownloadState.IN_PROGRESS || fileData.state == DownloadState.ERROR -> {
+                                    onMessageEvent?.invoke(MessageEvents.CancelDownload(file.path))
+                                }
+                            }
+                        }
+                        .background(MaterialTheme.colorScheme.primary)
+                        .size(64.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when {
+                        fileExists || fileData?.state == DownloadState.SUCCESS -> {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_file),
+                                contentDescription = "file"
+                            )
+                        }
+
+                        fileData == null -> {
+                            Icon(
+                                painter = painterResource(id = R.drawable.round_arrow_downward_24),
+                                contentDescription = null
+                            )
+                        }
+
+                        fileData.state == DownloadState.IN_PROGRESS -> {
+                            val progress by animateFloatAsState(
+                                targetValue = fileData.progress.divIfNotZero(
+                                    100f
+                                ), label = ""
+                            )
+                            CircularProgressIndicator(
+                                progress = progress,
+                                strokeCap = StrokeCap.Round
+                            )
+                        }
+
+                        fileData.state == DownloadState.ERROR -> {
+                            Icon(
+                                painter = painterResource(id = R.drawable.round_error_outline_24),
+                                contentDescription = "error"
+                            )
+                        }
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = fileInfo.name,
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = fileInfo.size.bytesToHumanReadableSize(),
+                        modifier = Modifier.alpha(0.6f)
+                    )
+                }
+            }
         }
     }
 }
@@ -816,7 +940,7 @@ fun SwipeBox(
     content: @Composable RowScope.() -> Unit = {}
 ) {
     val offsetX = remember {
-        androidx.compose.animation.core.Animatable(0f)
+        Animatable(0f)
     }
     val alphaReply by animateFloatAsState(
         targetValue = when {
@@ -856,7 +980,7 @@ fun SwipeBox(
                 Orientation.Horizontal,
                 onDragStopped = {
                     scope.launch { offsetX.animateTo(0f, animationSpec = spring()) }
-                    if (offsetX.value < -190f && hapticFeedbackDone.not()){
+                    if (offsetX.value < -190f) {
                         onReplyRequest.invoke()
                     }
                 },

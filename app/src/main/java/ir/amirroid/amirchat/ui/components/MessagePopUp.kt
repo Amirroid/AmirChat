@@ -68,6 +68,7 @@ fun MessagePopUp(
     visible: Boolean,
     selectedMessage: MessageModel?,
     myFrom: Boolean,
+    onEvent: (MessagePopUpEvent) -> Unit,
     onDismissRequest: () -> Unit,
     onSelect: (String?) -> Unit
 ) {
@@ -177,7 +178,7 @@ fun MessagePopUp(
                 ) {
                     DropdownMenuItem(
                         text = { Text(text = stringResource(id = R.string.reply)) },
-                        onClick = { },
+                        onClick = { onEvent.invoke(MessagePopUpEvent.REPLY) },
                         leadingIcon = {
                             Icon(
                                 painter = painterResource(id = R.drawable.round_reply_24),
@@ -186,7 +187,7 @@ fun MessagePopUp(
                         })
                     DropdownMenuItem(
                         text = { Text(text = stringResource(id = R.string.copy)) },
-                        onClick = { },
+                        onClick = { onEvent.invoke(MessagePopUpEvent.COPY) },
                         leadingIcon = {
                             Icon(
                                 painter = painterResource(id = R.drawable.baseline_content_copy_24),
@@ -198,9 +199,8 @@ fun MessagePopUp(
                         onClick = { },
                         leadingIcon = {
                             Icon(
-                                painter = painterResource(id = R.drawable.round_reply_24),
+                                painter = painterResource(id = R.drawable.ic_forward),
                                 contentDescription = "forward",
-                                modifier = Modifier.rotate(180f)
                             )
                         })
                     DropdownMenuItem(
@@ -214,7 +214,7 @@ fun MessagePopUp(
                         })
                     DropdownMenuItem(
                         text = { Text(text = stringResource(id = R.string.delete)) },
-                        onClick = { },
+                        onClick = { onEvent.invoke(MessagePopUpEvent.DELETE) },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Outlined.Delete,
@@ -225,4 +225,10 @@ fun MessagePopUp(
             }
         }
     }
+}
+
+enum class MessagePopUpEvent {
+    DELETE,
+    COPY,
+    REPLY
 }

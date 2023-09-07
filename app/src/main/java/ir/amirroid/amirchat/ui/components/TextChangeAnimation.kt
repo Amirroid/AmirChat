@@ -11,6 +11,11 @@ import androidx.compose.animation.with
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.TextStyle
 
@@ -24,7 +29,32 @@ fun TextChangeAnimation(
     Row(verticalAlignment = Alignment.CenterVertically) {
         text.toCharArray().forEach {
             AnimatedContent(targetState = it, transitionSpec = {
-                slideInVertically { 100 } + fadeIn() with  slideOutVertically { -100 } + fadeOut()
+                slideInVertically { 100 } + fadeIn() with slideOutVertically { -100 } + fadeOut()
+            }, label = "") { text ->
+                Text(text = text.toString(), style = style)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalAnimationApi::class)
+@SuppressLint("UnusedContentLambdaTargetStateParameter")
+@Composable
+fun TextChangeAnimationCounter(
+    text: String,
+    style: TextStyle = TextStyle.Default
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        text.toCharArray().forEach { char ->
+            AnimatedContent(targetState = char, transitionSpec = {
+                if (
+                    (targetState.toString().toIntOrNull() ?: 0) >
+                    (initialState.toString().toIntOrNull() ?: 0)
+                ) {
+                    slideInVertically { 100 } + fadeIn() with slideOutVertically { -100 } + fadeOut()
+                } else {
+                    slideInVertically { -100 } + fadeIn() with slideOutVertically { 100 } + fadeOut()
+                }
             }, label = "") { text ->
                 Text(text = text.toString(), style = style)
             }

@@ -62,6 +62,7 @@ import ir.amirroid.amirchat.ui.features.search.SearchScreen
 import ir.amirroid.amirchat.ui.theme.AmirChatTheme
 import ir.amirroid.amirchat.utils.ChatPages
 import ir.amirroid.amirchat.utils.CircleShape
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 @AndroidEntryPoint

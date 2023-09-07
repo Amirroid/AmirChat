@@ -267,7 +267,11 @@ fun FileSelectorBottomSheet(
                                                         viewModel.musics.value[viewModel.musics.value.indexOfFirst { data -> data.data == path }]
                                                     Gson().toJson(music.toJsonMusic())
                                                 }
-
+                                                Constants.FILE -> {
+                                                    val file =
+                                                        viewModel.files.value[viewModel.files.value.indexOfFirst { data -> data.data == path }]
+                                                    Gson().toJson(file)
+                                                }
                                                 else -> ""
                                             }
                                             FileMessage(

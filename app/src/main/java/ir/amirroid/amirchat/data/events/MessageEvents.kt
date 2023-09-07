@@ -10,4 +10,7 @@ sealed class MessageEvents {
     class Click(val messageModel: MessageModel, val offset: Offset) : MessageEvents()
 
     class SetEmoji(val messageModel: MessageModel, val emoji: String?) : MessageEvents()
+
+    class DownloadFile(val path:String)  :MessageEvents()
+    class CancelDownload(val path:String)  :MessageEvents()
 }
