@@ -2,12 +2,16 @@ package ir.amirroid.amirchat.ui.components
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
+import android.media.ThumbnailUtils
 import android.net.Uri
 import android.os.Build.VERSION.SDK_INT
 import android.os.Environment
+import android.provider.MediaStore
+import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.Animatable
@@ -32,7 +36,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,8 +50,6 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -95,12 +96,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.FileProvider
 import coil.ImageLoader
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
+import coil.decode.VideoFrameDecoder
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -113,18 +116,20 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.rememberCameraPositionState
 import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.events.MessageEvents
+import ir.amirroid.amirchat.data.helpers.FileNetData
 import ir.amirroid.amirchat.data.helpers.DownloadState
 import ir.amirroid.amirchat.data.models.chat.FileMessage
 import ir.amirroid.amirchat.data.models.chat.MessageModel
 import ir.amirroid.amirchat.data.models.media.ContactModel
 import ir.amirroid.amirchat.data.models.media.FileModel
 import ir.amirroid.amirchat.data.models.media.Location
+import ir.amirroid.amirchat.data.models.media.MediaConvertModel
+import ir.amirroid.amirchat.data.models.media.MediaModel
 import ir.amirroid.amirchat.data.models.media.MusicModelForJson
 import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.utils.Constants
 import ir.amirroid.amirchat.utils.bytesToHumanReadableSize
-import ir.amirroid.amirchat.utils.divIfNotZero
 import ir.amirroid.amirchat.utils.formatTime
 import ir.amirroid.amirchat.utils.formatTimeHourMinute
 import ir.amirroid.amirchat.utils.getColorOfMessage
@@ -132,10 +137,12 @@ import ir.amirroid.amirchat.utils.getEmoji
 import ir.amirroid.amirchat.utils.getName
 import ir.amirroid.amirchat.utils.getShapeOfMessage
 import ir.amirroid.amirchat.utils.getTextColorOfMessage
+import ir.amirroid.amirchat.utils.getType
 import ir.amirroid.amirchat.utils.toDp
-import ir.amirroid.amirchat.viewmodels.ChatViewModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
@@ -151,7 +158,9 @@ fun MessageView(
     replyMessage: MessageModel?,
     selected: Boolean,
     to: UserModel,
-    selectionMode: Boolean
+    selectionMode: Boolean,
+    downloadFiles: HashMap<String, FileNetData>,
+    uploadFiles: HashMap<String, FileNetData>,
 ) {
     val context = LocalContext.current
     var size by remember {
@@ -208,22 +217,48 @@ fun MessageView(
                 onMessageEvent?.invoke(MessageEvents.Reply(message.id))
             }) {
             if (message.files.firstOrNull()?.type == Constants.STICKER) {
-                Image(
-                    painter = rememberAsyncImagePainter(
-                        model = ImageRequest.Builder(context).data(message.files.first()).build(),
-                        imageLoader = ImageLoader.Builder(context)
-                            .allowHardware(true)
-                            .components {
-                                if (SDK_INT >= 28) {
-                                    add(ImageDecoderDecoder.Factory())
-                                } else {
-                                    add(GifDecoder.Factory())
+                var state by remember {
+                    mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Empty)
+                }
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                    contentAlignment = if (isMyUser) Alignment.CenterEnd else Alignment.CenterStart
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Image(
+                            painter = rememberAsyncImagePainter(
+                                model = ImageRequest.Builder(context)
+                                    .data(message.files.first().path)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .build(),
+                                imageLoader = ImageLoader.Builder(context)
+                                    .components {
+                                        if (message.files.first().path.getType().contains("gif")) {
+                                            if (SDK_INT >= 28) {
+                                                add(ImageDecoderDecoder.Factory(false))
+                                            } else {
+                                                add(GifDecoder.Factory(false))
+                                            }
+                                        }
+                                    }.build(),
+                                onState = {
+                                    state = it
                                 }
-                            }.build()
-                    ),
-                    contentDescription = null,
-                    modifier = Modifier.size(200.dp)
-                )
+                            ),
+                            contentDescription = null,
+                            modifier = Modifier.size(200.dp)
+                        )
+                        if (state is AsyncImagePainter.State.Loading) {
+                            CircularProgressIndicator(strokeCap = StrokeCap.Round)
+                        }
+                        if (state is AsyncImagePainter.State.Error) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.round_error_outline_24),
+                                contentDescription = "error"
+                            )
+                        }
+                    }
+                }
             } else {
                 MessageView(
                     message = message,
@@ -234,7 +269,9 @@ fun MessageView(
                     onContentClick,
                     onMessageEvent,
                     replyMessage,
-                    to
+                    to,
+                    downloadFiles,
+                    uploadFiles
                 )
             }
         }
@@ -254,7 +291,9 @@ fun RowScope.MessageView(
     onContentClick: ((Offset, Size, Pair<MessageModel, FileMessage>) -> Unit)? = null,
     onMessageEvent: ((MessageEvents) -> Unit)?,
     replyMessage: MessageModel?,
-    to: UserModel
+    to: UserModel,
+    downloadFiles: HashMap<String, FileNetData>,
+    uploadFiles: HashMap<String, FileNetData>,
 ) {
     Box(
         modifier = Modifier
@@ -329,7 +368,9 @@ fun RowScope.MessageView(
                     message,
                     currentPosition,
                     playingMusic,
-                    onMessageEvent
+                    downloadFiles,
+                    onMessageEvent,
+                    uploadFiles,
                 ) { offset, size, file ->
                     onContentClick?.invoke(offset, size, Pair(message, file))
                 }
@@ -475,12 +516,14 @@ fun FilesContent(
     message: MessageModel,
     currentPosition: Long? = null,
     playingMusic: Uri,
+    downloadFiles: HashMap<String, FileNetData>,
     onMessageEvent: ((MessageEvents) -> Unit)? = null,
+    uploadFiles: HashMap<String, FileNetData>,
     onContentClick: ((Offset, Size, FileMessage) -> Unit)?
 ) {
     when (message.files.first().type) {
         Constants.GALLERY -> {
-            GalleryView(message, onContentClick)
+            GalleryView(message, onContentClick, uploadFiles)
         }
 
         Constants.MUSIC -> {
@@ -496,56 +539,100 @@ fun FilesContent(
         }
 
         Constants.FILE -> {
-            FilesView(message, onMessageEvent)
+            FilesView(message, downloadFiles, onMessageEvent)
         }
     }
 }
 
 @Composable
-fun FilesView(message: MessageModel, onMessageEvent: ((MessageEvents) -> Unit)?) {
-    val downloadFiles by ChatViewModel.downloadFiles.collectAsStateWithLifecycle()
+fun FilesView(
+    message: MessageModel,
+    downloadFiles: HashMap<String, FileNetData>, onMessageEvent: ((MessageEvents) -> Unit)?
+) {
+    val context = LocalContext.current
     Column {
         message.files.forEach { file ->
-            val fileExists = if (message.from == CurrentUser.token) {
-                File(file.fromPath).exists() || File(
-                    Environment.DIRECTORY_DOWNLOADS + File.separator + file.path.split("/").last()
-                ).exists()
-            } else {
-                File(
-                    Environment.DIRECTORY_DOWNLOADS + File.separator + file.path.split("/").last()
-                ).exists()
-            }
             val fileData = downloadFiles[file.path]
             val fileInfo = Gson().fromJson(file.data, FileModel::class.java)
+            val downloadFile =
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val fileOpen = if (message.from == CurrentUser.token) {
+                if (File(file.fromPath).exists()) {
+                    File(file.fromPath)
+                } else {
+                    File(downloadFile, file.reference)
+                }
+            } else {
+                File(downloadFile, file.reference)
+            }
+            val fileExists = fileOpen.exists()
+            val fileSizeEqual = fileOpen.length() == fileInfo.size
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .padding(horizontal = 12.dp)
+                        .padding(start = 4.dp, end = 12.dp)
                         .clip(CircleShape)
                         .clickable {
                             when {
-                                fileExists -> {
 
+                                fileData?.state == DownloadState.IN_PROGRESS || fileData?.state == DownloadState.ERROR -> {
+                                    onMessageEvent?.invoke(MessageEvents.CancelDownload(file.reference))
+                                }
+
+                                fileExists || fileData?.state == DownloadState.SUCCESS && fileSizeEqual -> {
+                                    val fileUri = FileProvider.getUriForFile(
+                                        context,
+                                        context.packageName + ".provider",
+                                        fileOpen,
+                                    )
+                                    val intent = Intent(Intent.ACTION_VIEW)
+                                    intent.setDataAndType(fileUri, fileInfo.mimeType)
+                                    context.startActivity(
+                                        Intent.createChooser(
+                                            intent,
+                                            context.getString(R.string.open_with)
+                                        ),
+                                    )
                                 }
 
                                 fileData == null -> {
-                                    onMessageEvent?.invoke(MessageEvents.DownloadFile(file.path))
+                                    onMessageEvent?.invoke(MessageEvents.DownloadFile(file.reference))
                                 }
 
-                                fileData.state == DownloadState.IN_PROGRESS || fileData.state == DownloadState.ERROR -> {
-                                    onMessageEvent?.invoke(MessageEvents.CancelDownload(file.path))
-                                }
                             }
                         }
-                        .background(MaterialTheme.colorScheme.primary)
-                        .size(64.dp),
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .size(48.dp)
+                        .padding(4.dp),
                     contentAlignment = Alignment.Center
                 ) {
+                    Log.d("feefre", "FilesView: " + fileOpen.path + "   $fileData  $fileExists")
                     when {
-                        fileExists || fileData?.state == DownloadState.SUCCESS -> {
+                        fileData?.state == DownloadState.IN_PROGRESS -> {
+                            val progress by animateFloatAsState(
+                                targetValue = fileData.progress, label = ""
+                            )
+                            CircularProgressIndicator(
+                                progress = progress,
+                                strokeCap = StrokeCap.Round,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        fileData?.state == DownloadState.ERROR -> {
+                            Icon(
+                                painter = painterResource(id = R.drawable.round_error_outline_24),
+                                contentDescription = "error"
+                            )
+                        }
+
+                        fileExists || fileData?.state == DownloadState.SUCCESS && fileSizeEqual -> {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_file),
                                 contentDescription = "file"
@@ -559,36 +646,26 @@ fun FilesView(message: MessageModel, onMessageEvent: ((MessageEvents) -> Unit)?)
                             )
                         }
 
-                        fileData.state == DownloadState.IN_PROGRESS -> {
-                            val progress by animateFloatAsState(
-                                targetValue = fileData.progress.divIfNotZero(
-                                    100f
-                                ), label = ""
-                            )
-                            CircularProgressIndicator(
-                                progress = progress,
-                                strokeCap = StrokeCap.Round
-                            )
-                        }
-
-                        fileData.state == DownloadState.ERROR -> {
+                        else -> {
                             Icon(
                                 painter = painterResource(id = R.drawable.round_error_outline_24),
                                 contentDescription = "error"
                             )
                         }
+
                     }
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = fileInfo.name,
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = fileInfo.size.bytesToHumanReadableSize(),
-                        modifier = Modifier.alpha(0.6f)
+                        modifier = Modifier.alpha(0.6f),
+                        style = MaterialTheme.typography.labelSmall
                     )
                 }
             }
@@ -787,9 +864,20 @@ fun MusicContent(
 }
 
 @Composable
-fun GalleryView(message: MessageModel, onContentClick: ((Offset, Size, FileMessage) -> Unit)?) {
+fun GalleryView(
+    message: MessageModel,
+    onContentClick: ((Offset, Size, FileMessage) -> Unit)?,
+    uploadFiles: HashMap<String, FileNetData>,
+) {
     val files = message.files
     val context = LocalContext.current
+    val videoLoader = ImageLoader.Builder(context)
+        .components {
+            add(VideoFrameDecoder.Factory())
+        }
+        .build()
+    val imageLoader = ImageLoader.Builder(context)
+        .build()
     Box(
         modifier = Modifier
             .padding(4.dp)
@@ -806,32 +894,76 @@ fun GalleryView(message: MessageModel, onContentClick: ((Offset, Size, FileMessa
             var size by remember {
                 mutableStateOf(Size.Zero)
             }
-            LaunchedEffect(key1 = Unit) {
-                if (message.from == CurrentUser.token) {
-                    bitmap = BitmapFactory.decodeFile(files.first().fromPath)
-                    ImageRequest.Builder(context).data(files.first().path)
+            LaunchedEffect(key1 = files.first()) {
+                if (files.first().path.getType().startsWith("video")) {
+                    if (message.from == CurrentUser.token) {
+                        val request = ImageRequest.Builder(context)
+                            .data(files.first().fromPath)
+                            .target { b -> bitmap = (b as BitmapDrawable).bitmap }
+                            .build()
+                        videoLoader.enqueue(request)
+                    }
+                    val request = ImageRequest.Builder(context)
+                        .data(files.first().path)
                         .diskCachePolicy(CachePolicy.ENABLED)
-                        .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
+                        .target { b -> bitmap = (b as BitmapDrawable).bitmap }
+                        .build()
+                    videoLoader.enqueue(request)
                 } else {
-                    ImageRequest.Builder(context).data(files.first().path)
-                        .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
+                    if (message.from == CurrentUser.token) {
+                        bitmap = BitmapFactory.decodeFile(files.first().fromPath)
+                    }
+                    val request = ImageRequest.Builder(context).data(files.first().path)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .target { b -> bitmap = (b as BitmapDrawable).bitmap }
+                        .build()
+                    imageLoader.enqueue(request)
                 }
             }
-            AsyncImage(
-                model = bitmap,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clickable(enabled = onContentClick != null) {
-                        onContentClick?.invoke(offset, size, files.first())
+            Box(contentAlignment = Alignment.Center) {
+                AsyncImage(
+                    model = bitmap,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clickable(enabled = onContentClick != null) {
+                            onContentClick?.invoke(offset, size, files.first())
+                        }
+                        .onGloballyPositioned {
+                            offset = it.positionInWindow()
+                            size = it.size.toSize()
+                        },
+                    contentScale = ContentScale.Crop,
+                )
+                val uploadData = uploadFiles[files.first().fromPath]
+                if (message.from == CurrentUser.token && uploadData != null && uploadData.state == DownloadState.IN_PROGRESS) {
+                    val progress by animateFloatAsState(
+                        targetValue = uploadData.progress,
+                        label = ""
+                    )
+                    CircularProgressIndicator(
+                        progress,
+                        strokeCap = StrokeCap.Round
+                    )
+                }
+                if (files.first().path.getType().startsWith("video")) {
+                    val data =
+                        Gson().fromJson(files.first().data, MediaConvertModel::class.java)
+                    Box(
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(0.7f))
+                            .align(Alignment.TopEnd)
+                            .wrapContentSize()
+                            .padding(vertical = 2.dp, horizontal = 4.dp)
+                    ) {
+                        Text(text = data.duration.formatTime(), fontSize = 12.sp)
                     }
-                    .onGloballyPositioned {
-                        offset = it.positionInWindow()
-                        size = it.size.toSize()
-                    },
-                contentScale = ContentScale.Crop
-            )
+                }
+            }
         } else {
             Column {
                 for (i in (0..files.size.plus(1).div(2).minus(1))) {
@@ -849,53 +981,115 @@ fun GalleryView(message: MessageModel, onContentClick: ((Offset, Size, FileMessa
                         var bitmap2 by remember {
                             mutableStateOf<Bitmap?>(null)
                         }
-                        LaunchedEffect(key1 = Unit) {
-                            if (message.from == CurrentUser.token) {
-                                bitmap = BitmapFactory.decodeFile(files[index].fromPath)
-                                ImageRequest.Builder(context).data(files[index].path)
+                        LaunchedEffect(key1 = files[index].path) {
+                            if (files[index].path.getType().startsWith("video")) {
+                                if (message.from == CurrentUser.token) {
+                                    val request = ImageRequest.Builder(context)
+                                        .data(files[index].fromPath)
+                                        .target { b ->
+                                            bitmap = (b as BitmapDrawable).bitmap
+                                        }
+                                        .build()
+                                    videoLoader.enqueue(request)
+                                }
+                                val request = ImageRequest.Builder(context)
+                                    .data(files[index].path)
                                     .diskCachePolicy(CachePolicy.ENABLED)
                                     .target { b -> bitmap = (b as BitmapDrawable).bitmap }
                                     .build()
-                                if (files.size.minus(1) >= index.plus(1)) {
+                                videoLoader.enqueue(request)
+                            } else {
+                                if (message.from == CurrentUser.token) {
+                                    bitmap =
+                                        BitmapFactory.decodeFile(files[index].fromPath)
+                                }
+                                val request =
+                                    ImageRequest.Builder(context).data(files[index].path)
+                                        .diskCachePolicy(CachePolicy.ENABLED)
+                                        .memoryCachePolicy(CachePolicy.ENABLED)
+                                        .target { b -> bitmap = (b as BitmapDrawable).bitmap }
+                                        .build()
+                                imageLoader.enqueue(request)
+                            }
+                        }
+                        LaunchedEffect(key1 = files[index.plus(1)].path) {
+                            if (files[index.plus(1)].path.getType().startsWith("video")) {
+                                if (message.from == CurrentUser.token) {
+                                    val request = ImageRequest.Builder(context)
+                                        .data(files[index.plus(1)].fromPath)
+                                        .target { b ->
+                                            bitmap2 = (b as BitmapDrawable).bitmap
+                                        }
+                                        .build()
+                                    videoLoader.enqueue(request)
+                                }
+                                val request = ImageRequest.Builder(context)
+                                    .data(files[index.plus(1)].path)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .target { b -> bitmap2 = (b as BitmapDrawable).bitmap }
+                                    .build()
+                                videoLoader.enqueue(request)
+                            } else {
+                                if (message.from == CurrentUser.token) {
                                     bitmap2 =
                                         BitmapFactory.decodeFile(files[index.plus(1)].fromPath)
-                                    ImageRequest.Builder(context)
-                                        .data(files[index.plus(1)].path)
-                                        .diskCachePolicy(CachePolicy.ENABLED)
-                                        .target { b ->
-                                            bitmap2 = (b as BitmapDrawable).bitmap
-                                        }
-                                        .build()
                                 }
-                            } else {
-                                ImageRequest.Builder(context).data(files[index].path)
-                                    .target { b -> bitmap = (b as BitmapDrawable).bitmap }
+                                val request = ImageRequest.Builder(context)
+                                    .data(files[index.plus(1)].path)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .target { b -> bitmap2 = (b as BitmapDrawable).bitmap }
                                     .build()
-                                if (files.size.minus(1) >= index.plus(1)) {
-                                    ImageRequest.Builder(context)
-                                        .data(files[index.plus(1)].path)
-                                        .target { b ->
-                                            bitmap2 = (b as BitmapDrawable).bitmap
-                                        }
-                                        .build()
+                                imageLoader.enqueue(request)
+                            }
+                        }
+                        Box(
+                            contentAlignment = Alignment.Center, modifier = Modifier
+                                .weight(1f)
+                        ) {
+                            AsyncImage(
+                                model = bitmap,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .heightIn(max = 200.dp)
+                                    .clickable(enabled = onContentClick != null) {
+                                        onContentClick?.invoke(offset, size, files[index])
+                                    }
+                                    .onGloballyPositioned {
+                                        offset = it.positionInWindow()
+                                        size = it.size.toSize()
+                                    },
+                                contentScale = ContentScale.Crop
+                            )
+                            val uploadData = uploadFiles[files[index].fromPath]
+                            if (message.from == CurrentUser.token && uploadData != null && uploadData.state == DownloadState.IN_PROGRESS) {
+                                val progress by animateFloatAsState(
+                                    targetValue = uploadData.progress,
+                                    label = ""
+                                )
+                                CircularProgressIndicator(
+                                    progress,
+                                    strokeCap = StrokeCap.Round
+                                )
+                            }
+                            if (files[index].path.getType().startsWith("video")) {
+                                val data = Gson().fromJson(
+                                    files[index].data,
+                                    MediaConvertModel::class.java
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.Black.copy(0.7f))
+                                        .align(Alignment.TopEnd)
+                                        .wrapContentSize()
+                                        .padding(vertical = 2.dp, horizontal = 4.dp)
+                                ) {
+                                    Text(text = data.duration.formatTime(), fontSize = 12.sp)
                                 }
                             }
                         }
-                        AsyncImage(
-                            model = bitmap,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(max = 200.dp)
-                                .clickable(enabled = onContentClick != null) {
-                                    onContentClick?.invoke(offset, size, files[index])
-                                }
-                                .onGloballyPositioned {
-                                    offset = it.positionInWindow()
-                                    size = it.size.toSize()
-                                },
-                            contentScale = ContentScale.Crop
-                        )
                         if (files.size.minus(1) >= index.plus(1)) {
                             var offset2 by remember {
                                 mutableStateOf(Offset.Zero)
@@ -904,21 +1098,57 @@ fun GalleryView(message: MessageModel, onContentClick: ((Offset, Size, FileMessa
                                 mutableStateOf(Size.Zero)
                             }
                             Spacer(modifier = Modifier.width(2.dp))
-                            AsyncImage(
-                                model = bitmap2,
-                                contentDescription = null,
+                            Box(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(max = 200.dp)
-                                    .clickable(enabled = onContentClick != null) {
-                                        onContentClick?.invoke(offset2, size2, files[index.plus(1)])
+                                    .weight(1f), contentAlignment = Alignment.Center
+                            ) {
+                                AsyncImage(
+                                    model = bitmap2,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .heightIn(max = 200.dp)
+                                        .clickable(enabled = onContentClick != null) {
+                                            onContentClick?.invoke(
+                                                offset2,
+                                                size2,
+                                                files[index.plus(1)]
+                                            )
+                                        }
+                                        .onGloballyPositioned {
+                                            offset2 = it.positionInWindow()
+                                            size2 = it.size.toSize()
+                                        },
+                                    contentScale = ContentScale.Crop
+                                )
+                                val uploadData = uploadFiles[files[index.plus(1)].fromPath]
+                                if (message.from == CurrentUser.token && uploadData != null && uploadData.state == DownloadState.IN_PROGRESS) {
+                                    val progress by animateFloatAsState(
+                                        targetValue = uploadData.progress,
+                                        label = ""
+                                    )
+                                    CircularProgressIndicator(
+                                        progress,
+                                        strokeCap = StrokeCap.Round
+                                    )
+                                }
+                                if (files[index.plus(1)].path.getType().startsWith("video")) {
+                                    val data = Gson().fromJson(
+                                        files[index.plus(1)].data,
+                                        MediaConvertModel::class.java
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(8.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.Black.copy(0.7f))
+                                            .align(Alignment.TopEnd)
+                                            .wrapContentSize()
+                                            .padding(vertical = 2.dp, horizontal = 4.dp)
+                                    ) {
+                                        Text(text = data.duration.formatTime(), fontSize = 12.sp)
                                     }
-                                    .onGloballyPositioned {
-                                        offset2 = it.positionInWindow()
-                                        size2 = it.size.toSize()
-                                    },
-                                contentScale = ContentScale.Crop
-                            )
+                                }
+                            }
                         }
                     }
                     if (files.size >= index.plus(2)) {

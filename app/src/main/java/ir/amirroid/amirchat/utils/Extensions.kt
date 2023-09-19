@@ -14,7 +14,9 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.models.chat.ChatRoom
+import ir.amirroid.amirchat.data.models.chat.FileMessage
 import ir.amirroid.amirchat.data.models.media.FileModel
+import ir.amirroid.amirchat.data.models.media.MediaConvertModel
 import ir.amirroid.amirchat.data.models.media.MediaModel
 import ir.amirroid.amirchat.data.models.media.MusicModel
 import ir.amirroid.amirchat.data.models.media.MusicModelForJson
@@ -34,7 +36,7 @@ fun ImageView.setTint(color: Int) = setColorFilter(
 )
 
 fun MediaModel.getType() = URLConnection.guessContentTypeFromName(name) ?: ""
-fun String.getType() = URLConnection.guessContentTypeFromName(this) ?: ""
+fun String.getType() = URLConnection.guessContentTypeFromName(this) ?: "text/plain"
 
 
 fun Long.formatTime(): String {
@@ -170,3 +172,24 @@ fun MusicModel.toJsonMusic() = MusicModelForJson(
     id,
     uri.toString()
 )
+
+fun MediaModel.toMediaJson() = MediaConvertModel(
+    name,
+    data,
+    duration,
+    id,
+    uri.toString(),
+    dateAdded
+)
+
+fun <T> MutableList<T>.addAllIf(
+    list: List<T>,
+    condition: List<T>.(obj1: T) -> Boolean
+): List<T> {
+    list.forEach { model ->
+        if (condition.invoke(this, model)) {
+            add(model)
+        }
+    }
+    return this.toList()
+}

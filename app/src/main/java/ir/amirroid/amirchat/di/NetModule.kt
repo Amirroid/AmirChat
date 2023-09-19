@@ -7,6 +7,7 @@ import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.LocalCacheSettings
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.messaging.ktx.messaging
 import com.google.firebase.storage.ktx.storage
 import dagger.Module
 import dagger.Provides
@@ -57,9 +58,11 @@ object NetModule {
     @Singleton
     fun provideDatabase(
         firebase: Firebase
-    ) = firebase.database.apply {
-        setPersistenceEnabled(true)
-    }.reference.apply {
-        keepSynced(true)
-    }
+    ) = firebase.database.reference
+
+    @Provides
+    @Singleton
+    fun provideMessaging(
+        firebase: Firebase
+    ) = firebase.messaging
 }

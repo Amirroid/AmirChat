@@ -6,6 +6,7 @@ import kotlinx.parcelize.Parcelize
 
 data class UserModel(
     val token: String = "",
+    val fcmToken: String = "",
     var mobileNumber: String = "",
     var firstName: String = "",
     var lastName: String = "",

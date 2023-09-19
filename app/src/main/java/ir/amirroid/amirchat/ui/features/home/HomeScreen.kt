@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Menu
@@ -58,6 +58,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.google.gson.Gson
 import ir.amirroid.amirchat.R
@@ -66,13 +67,12 @@ import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.ui.components.ChatPopUp
 import ir.amirroid.amirchat.ui.components.UserListItem
 import ir.amirroid.amirchat.utils.ChatPages
-import ir.amirroid.amirchat.utils.SimpleList
 import ir.amirroid.amirchat.utils.id
 import ir.amirroid.amirchat.viewmodels.home.HomeViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     navigation: NavController
@@ -165,7 +165,9 @@ fun HomeScreen(
             ) {
                 items(rooms.size) {
                     val room = rooms[it]
-                    UserListItem(room = room, density = density, onClick = {
+                    UserListItem(room = room, density = density, onDelete = {
+                        viewModel.deleteRoom(room)
+                    }, onClick = {
                         val toUser = if (room.from.token == CurrentUser.token) {
                             room.to
                         } else room.from
@@ -174,7 +176,7 @@ fun HomeScreen(
                                 toUser
                             )
                         )
-                    }) {
+                    }, modifier= Modifier.animateItemPlacement()) {
                         popUpChatRoom = room
                     }
                 }
@@ -215,6 +217,7 @@ fun DrawerContent(
                     model = ImageRequest.Builder(context)
                         .data(image)
                         .crossfade(true)
+                        .diskCachePolicy(CachePolicy.ENABLED)
                         .crossfade(500)
                         .build(),
                     contentDescription = "profile",

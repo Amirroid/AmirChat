@@ -137,3 +137,8 @@ fun getTypeForFile(type: String, context: Context): Int {
         else -> Constants.FILE
     }
 }
+
+fun getTextForStatus(status:Int, context: Context) = when(status) {
+    Constants.TYPING -> context.getString(R.string.typing)
+    else -> context.getString(R.string.typing)
+}

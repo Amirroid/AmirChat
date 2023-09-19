@@ -160,6 +160,7 @@ import ir.amirroid.amirchat.utils.getType
 import ir.amirroid.amirchat.utils.getTypeForFile
 import ir.amirroid.amirchat.utils.toDp
 import ir.amirroid.amirchat.utils.toJsonMusic
+import ir.amirroid.amirchat.utils.toMediaJson
 import ir.amirroid.amirchat.viewmodels.ChatViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -267,11 +268,19 @@ fun FileSelectorBottomSheet(
                                                         viewModel.musics.value[viewModel.musics.value.indexOfFirst { data -> data.data == path }]
                                                     Gson().toJson(music.toJsonMusic())
                                                 }
+
                                                 Constants.FILE -> {
                                                     val file =
                                                         viewModel.files.value[viewModel.files.value.indexOfFirst { data -> data.data == path }]
                                                     Gson().toJson(file)
                                                 }
+
+                                                Constants.GALLERY -> {
+                                                    val file =
+                                                        viewModel.medias.value[viewModel.medias.value.indexOfFirst { data -> data.data == path }].toMediaJson()
+                                                    Gson().toJson(file)
+                                                }
+
                                                 else -> ""
                                             }
                                             FileMessage(

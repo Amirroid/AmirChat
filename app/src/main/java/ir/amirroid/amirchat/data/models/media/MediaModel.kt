@@ -10,3 +10,13 @@ data class MediaModel(
     val uri:Uri,
     val dateAdded:Long
 )
+
+
+data class MediaConvertModel(
+    val name: String,
+    val data: String,
+    val duration: Long,
+    val id: Long,
+    val uri:String,
+    val dateAdded:Long
+)

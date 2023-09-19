@@ -25,6 +25,9 @@ object Constants {
     const val STICKER = 6
 
 
+    const val TYPING = 1
+
+
     // pages
     const val REGISTER = "register"
     const val HOME = "home"
@@ -44,10 +47,18 @@ object Constants {
 
 
     // references
+    const val USERS_STATUS = "usersStatus"
+    const val LAST_ONLINE = "lastOnline"
     const val USERS = "Users"
     const val ROOMS = "Rooms"
     const val CHATS = "Chats"
+    const val ONLINE = "online"
 
+    // database
+    const val SENDING_MESSAGES = "sending_messages"
+
+    // notifs
+    const val NOTIF_ID = "AmirChat"
 
     val listMessageEmoji = listOf(
         getEmoji(0X1F44D),

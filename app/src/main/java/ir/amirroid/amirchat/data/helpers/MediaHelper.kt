@@ -197,7 +197,7 @@ class MediaHelper @Inject constructor(
         val sizeP = MediaStore.Files.FileColumns.SIZE
         val idP = MediaStore.Files.FileColumns._ID
         val mimTypeC = MediaStore.Files.FileColumns.MIME_TYPE
-        val selection = "$mimTypeC IN('application/pdf') OR $mimTypeC LIKE 'application/vnd%'"
+        val selection = "$mimTypeC IS NOT NULL"
         val projection = arrayOf(
             mimeTypeP,
             nameP,

@@ -58,14 +58,19 @@ fun UserListItem(
     room: ChatRoom,
     context: Context = LocalContext.current,
     density: Density,
+    onDelete: () -> Unit,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    modifier: Modifier,
+    onLongClick: () -> Unit,
 ) {
     val user = if (room.from.token == CurrentUser.token) {
         room.to
     } else room.from
     val dismissState = rememberDismissState(positionalThreshold = {
         it * .5f
+    }, confirmValueChange = {
+        onDelete.invoke()
+        true
     })
     SwipeToDismiss(state = dismissState, background = {
         Box(
@@ -157,5 +162,5 @@ fun UserListItem(
                 }
             }
         )
-    }, directions = setOf(DismissDirection.EndToStart))
+    }, directions = setOf(DismissDirection.EndToStart), modifier = modifier)
 }

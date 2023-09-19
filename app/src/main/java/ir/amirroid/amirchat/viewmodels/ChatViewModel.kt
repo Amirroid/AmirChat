@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,14 +12,14 @@ import androidx.media3.exoplayer.ExoPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import ir.amirroid.amirchat.R
-import ir.amirroid.amirchat.data.helpers.DownloadData
+import ir.amirroid.amirchat.data.helpers.FileNetData
 import ir.amirroid.amirchat.data.helpers.DownloadHelper
-import ir.amirroid.amirchat.data.helpers.DownloadState
 import ir.amirroid.amirchat.data.helpers.MusicHelper
 import ir.amirroid.amirchat.data.helpers.RecorderHelper
 import ir.amirroid.amirchat.data.models.chat.ChatRoom
 import ir.amirroid.amirchat.data.models.chat.FileMessage
 import ir.amirroid.amirchat.data.models.chat.MessageModel
+import ir.amirroid.amirchat.data.models.chat.UserStatus
 import ir.amirroid.amirchat.data.models.media.ContactModel
 import ir.amirroid.amirchat.data.models.media.FileModel
 import ir.amirroid.amirchat.data.models.media.MediaModel
@@ -28,11 +29,14 @@ import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.data.repositories.FileRepository
 import ir.amirroid.amirchat.data.repositories.chats.ChatRepository
 import ir.amirroid.amirchat.utils.Constants
+import ir.amirroid.amirchat.utils.addAllIf
 import ir.amirroid.amirchat.utils.id
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
@@ -94,29 +98,46 @@ class ChatViewModel @Inject constructor(
     private val _showRecordPreview = MutableStateFlow(false)
     val showRecordPreview = _showRecordPreview.asStateFlow()
 
+    var showEmojiKeyboard = MutableStateFlow(false)
+    var showKeyboard = MutableStateFlow(true)
+
+    private val _status = MutableStateFlow<UserStatus?>(null)
+    val status = _status.asStateFlow()
+
     private lateinit var clipboardManager: ClipboardManager
 
+    private var sendingMessages = emptyList<MessageModel>()
+
+    private var toUser = UserModel()
 
     init {
         observeToMusicStates()
     }
 
     companion object {
-        val downloadFiles = MutableStateFlow<HashMap<String, DownloadData>>(hashMapOf())
+        val downloadFiles = MutableStateFlow<HashMap<String, FileNetData>>(hashMapOf())
+        val uploadFiles = MutableStateFlow<HashMap<String, FileNetData>>(hashMapOf())
     }
 
     fun observeToChats(
         room: String?,
         user: UserModel
     ) {
+        toUser = user
+        observeToStatus()
         if (room == null) {
             chatRepository.addRoomWithUser(
                 user
             ) { createdRoom ->
                 _room.value = createdRoom
                 chatRepository.observeToChat(createdRoom.id) {
-                    _chats.value = it
+                    _chats.value = it.toMutableList().addAllIf(
+                        it
+                    ) { model ->
+                        any { obj -> obj.id != model.id }
+                    }.sortedBy { message -> message.index }
                 }
+                observeToSending()
             }
         } else {
             _room.value = if (room.split("-").first() == CurrentUser.token) {
@@ -131,8 +152,28 @@ class ChatViewModel @Inject constructor(
                 )
             }
             chatRepository.observeToChat(room) {
-                _chats.value = it
+                _chats.value = it.toMutableList().addAllIf(
+                    it
+                ) { model ->
+                    any { obj -> obj.id != model.id }
+                }.sortedBy { message -> message.index }
             }
+            observeToSending()
+        }
+    }
+
+    private fun observeToStatus() {
+        chatRepository.observeToStatus(toUser.token) {
+            _status.value = it
+        }
+    }
+
+    private fun observeToSending() = viewModelScope.launch(Dispatchers.IO) {
+        chatRepository.getAllSending(_room.value?.id ?: "").collectLatest {
+            sendingMessages = it
+            _chats.value = _chats.value.toMutableList().apply {
+                addAll(sendingMessages)
+            }.sortedBy { message -> message.index }
         }
     }
 
@@ -145,12 +186,13 @@ class ChatViewModel @Inject constructor(
                 files = files,
                 status = Constants.SEND,
                 replyToId = reply.value,
+                index = _chats.value.size
             )
-        )
-    }
-
-    fun setMessages(messages: List<MessageModel>) {
-        _chats.value = messages
+        ) { response ->
+            uploadFiles.value = uploadFiles.value.apply {
+                this[response.url] = response
+            }
+        }
     }
 
     private fun startTimer() = viewModelScope.launch {
@@ -317,9 +359,15 @@ class ChatViewModel @Inject constructor(
                 this[url] = it
             }
             downloadFiles.value = newData
+            Log.d("efwwhofw", "downloadFile: $it")
         }
     }
-    fun cancelDownload(url:String){
+
+    fun cancelDownload(url: String) {
         downloadHelper.addCancel(url)
+    }
+
+    fun setUserStatus(userStatus: UserStatus) {
+        chatRepository.setStatus(userStatus)
     }
 }

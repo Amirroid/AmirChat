@@ -31,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -42,11 +43,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.ui.features.chat.AppBarChat
 import ir.amirroid.amirchat.utils.SimpleList
+import ir.amirroid.amirchat.viewmodels.ChatViewModel
 
 
 @Composable
@@ -156,6 +159,8 @@ fun ChatPopUp(
 
 @Composable
 fun ColumnScope.ChatUi() {
+    val downloadFiles by ChatViewModel.downloadFiles.collectAsStateWithLifecycle()
+    val uploadFiles by ChatViewModel.uploadFiles.collectAsStateWithLifecycle()
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -169,8 +174,10 @@ fun ColumnScope.ChatUi() {
             messages = emptyList(),
             showPattern = true,
             replyEnabled = false,
+            to = UserModel(),
+            downloadFiles = downloadFiles,
+            uploadFiles = uploadFiles
 
-            to = UserModel()
         )
     }
 }

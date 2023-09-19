@@ -3,7 +3,9 @@ package ir.amirroid.amirchat.data.auth
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.google.firebase.database.DatabaseReference
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.storage.StorageReference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import ir.amirroid.amirchat.data.helpers.AppSignatureHelper
@@ -31,11 +33,14 @@ class AuthManager @Inject constructor(
     private val okHttpClient: OkHttpClient,
     private val tokenHelper: TokenHelper,
     fireStore: FirebaseFirestore,
-    storage: StorageReference
+    storage: StorageReference,
+    private val messaging: FirebaseMessaging,
+    database: DatabaseReference
 ) {
 
     private val userDatabase = fireStore.collection(Constants.USERS)
     private val userStorage = storage.child(Constants.USERS)
+    private val usersStatus = database.child(Constants.USERS_STATUS)
     fun generateCode() = (100000..999999).random()
     fun generateHashCode() = signatureHelper.getSignatures().lastOrNull() ?: ""
     fun sendCode(
@@ -58,6 +63,7 @@ class AuthManager @Inject constructor(
             .build()
         okHttpClient.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
+                e.printStackTrace()
             }
 
             override fun onResponse(call: Call, response: Response) {
@@ -98,7 +104,7 @@ class AuthManager @Inject constructor(
                             UserModel(
                                 token, phone, firstName, lastName, id, bio, downloadUri.toString()
                             )
-                        userDatabase.add(
+                        userDatabase.document(token).set(
                             model
                         ).addOnSuccessListener {
                             scope.launch {
@@ -141,6 +147,7 @@ class AuthManager @Inject constructor(
         }
     }
 
+
     fun checkMobileExists(mobile: String, onCheck: (Boolean) -> Unit) {
         userDatabase.whereEqualTo("mobileNumber", mobile).get().addOnCompleteListener {
             if (it.isSuccessful) {
@@ -173,11 +180,27 @@ class AuthManager @Inject constructor(
     }
 
     fun getMyUser(onComplete: () -> Unit) {
-        if (CurrentUser.token != null) {
-            userDatabase.whereEqualTo("token", CurrentUser.token).get().addOnSuccessListener {
-                CurrentUser.setUser(it.first().toObject(UserModel::class.java))
-                onComplete.invoke()
+        userDatabase.document(CurrentUser.token ?: "").get().addOnSuccessListener {
+            it.toObject(UserModel::class.java)?.let { user -> CurrentUser.setUser(user) }
+            onComplete.invoke()
+            messaging.token.addOnSuccessListener { token ->
+                userDatabase.document(CurrentUser.token ?: "").update(
+                    mapOf(
+                        "fcmToken" to token
+                    )
+                )
             }
         }
+    }
+
+    fun setUserOnline(isOnline: Boolean) {
+        val children = hashMapOf<String, Any>(
+            Constants.ONLINE to isOnline,
+        ).apply {
+            if (isOnline.not()){
+                set(Constants.LAST_ONLINE, System.currentTimeMillis())
+            }
+        }
+        usersStatus.child(CurrentUser.token ?: "").updateChildren(children)
     }
 }

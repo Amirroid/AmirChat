@@ -35,6 +35,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.events.MessageEvents
+import ir.amirroid.amirchat.data.helpers.FileNetData
 import ir.amirroid.amirchat.data.models.chat.FileMessage
 import ir.amirroid.amirchat.data.models.chat.MessageModel
 import ir.amirroid.amirchat.data.models.register.CurrentUser
@@ -55,6 +56,8 @@ fun MessagesList(
     currentPosition: Long? = null,
     playingMusic: Uri = Uri.EMPTY,
     selectedList: List<MessageModel> = emptyList(),
+    downloadFiles: HashMap<String, FileNetData>,
+    uploadFiles: HashMap<String, FileNetData>,
 ) {
     val context = LocalContext.current
     val configuration = context.resources.configuration
@@ -106,7 +109,9 @@ fun MessagesList(
                         if (message.replyToId == null) null else messages.firstOrNull { user -> user.id == message.replyToId },
                         selectedList.contains(message),
                         to,
-                        selectedList.isNotEmpty()
+                        selectedList.isNotEmpty(),
+                        downloadFiles,
+                        uploadFiles
                     )
 //                    if (animatedList.contains(message).not()) {
 //                        LaunchedEffect(Unit) {

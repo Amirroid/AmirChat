@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import android.view.OnReceiveContentListener
 import android.view.View
 import android.view.ViewGroup
@@ -28,11 +29,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.FileProvider
 import androidx.core.graphics.drawable.toDrawable
+import androidx.core.net.toFile
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.widget.addTextChangedListener
+import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.utils.toDp
+import java.io.File
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -43,8 +48,9 @@ fun StickerTextField(
     showKeyboard: Boolean,
     context: Context = LocalContext.current,
     modifier: Modifier = Modifier,
+    enabled:Boolean,
     maxHeight: Float = 200.toDp(context),
-    onSendSticker : (Uri) -> Unit,
+    onSendSticker: (Uri) -> Unit,
     onFocusChanged: (Boolean) -> Unit
 ) {
     val textColor = MaterialTheme.colorScheme.onBackground
@@ -65,7 +71,7 @@ fun StickerTextField(
                         "image/gif",
                     )
                 )
-                val callback = stickerCallback {
+                val callback = stickerCallback(context) {
                     onSendSticker.invoke(it)
                 }
                 return InputConnectionCompat.createWrapper(connection, outAttrs, callback)
@@ -94,11 +100,12 @@ fun StickerTextField(
         editTextObj
     }
     val keyboard = context.getSystemService(InputMethodManager::class.java)
-    LaunchedEffect(key1 = showKeyboard) {
+    LaunchedEffect(key1 = showKeyboard, enabled) {
         if (showKeyboard.not()) {
             editText.clearFocus()
             keyboard.hideSoftInputFromWindow(editText.windowToken, 0)
         }
+        editText.isEnabled = enabled
     }
     DisposableEffect(key1 = Unit) {
         editText.requestFocus()
@@ -133,13 +140,18 @@ fun generateDrawableCursor(color: Int, context: Context): Drawable {
     return bitmap.toDrawable(context.resources)
 }
 
-fun stickerCallback(onCallBack: (Uri) -> Unit) =
+fun stickerCallback(context: Context, onCallBack: (Uri) -> Unit) =
     InputConnectionCompat.OnCommitContentListener { inputContentInfo, _, _ ->
         try {
             inputContentInfo.releasePermission()
         } catch (_: Exception) {
         }
-        val uri = inputContentInfo.linkUri ?: Uri.EMPTY
-        onCallBack.invoke(uri)
+        val uri = inputContentInfo.linkUri
+        Log.d("sdasd", "stickerCallback: $uri")
+        if (uri != null) {
+            onCallBack.invoke(uri)
+        } else {
+            Toast.makeText(context, context.getString(R.string.error), Toast.LENGTH_SHORT).show()
+        }
         true
     }

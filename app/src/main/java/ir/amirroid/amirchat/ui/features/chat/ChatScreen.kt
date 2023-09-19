@@ -48,6 +48,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -103,6 +104,7 @@ import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.events.MessageEvents
 import ir.amirroid.amirchat.data.models.chat.FileMessage
 import ir.amirroid.amirchat.data.models.chat.MessageModel
+import ir.amirroid.amirchat.data.models.chat.UserStatus
 import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.ui.components.AudioRecordedPreview
@@ -164,6 +166,11 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
     val currentPathRecording by viewModel.currentRecordingPath.collectAsStateWithLifecycle()
     val currentMusic by viewModel.currentMusic.collectAsStateWithLifecycle()
     val currentRoom by viewModel.room.collectAsStateWithLifecycle()
+    val downloadFiles by ChatViewModel.downloadFiles.collectAsStateWithLifecycle()
+    val uploadFiles by ChatViewModel.uploadFiles.collectAsStateWithLifecycle()
+    val status by viewModel.status.collectAsStateWithLifecycle()
+    val showEmojiKeyboard by viewModel.showEmojiKeyboard.collectAsStateWithLifecycle()
+    val showKeyboard by viewModel.showKeyboard.collectAsStateWithLifecycle()
     DisposableEffect(key1 = Unit) {
         viewModel.observeToChats(room, user)
         onDispose { focusManager.clearFocus() }
@@ -171,6 +178,16 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
     LaunchedEffect(key1 = messages.size) {
         delay(200)
         lazyState.animateScrollToItem(messages.size)
+    }
+    LaunchedEffect(key1 = showEmojiKeyboard, key2 = showKeyboard) {
+        viewModel.setUserStatus(
+            UserStatus(
+                true,
+                System.currentTimeMillis(),
+                user.token,
+                if (showKeyboard || showEmojiKeyboard) Constants.TYPING else null
+            )
+        )
     }
     Scaffold(bottomBar = {
         AnimatedContent(targetState = showRecordPreview, transitionSpec = {
@@ -194,43 +211,28 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                         viewModel.stopRecording(it)
                     }
                 } else {
-                    TextFieldChat(
-                        if (replyId == null) null else messages.firstOrNull { user -> user.id == replyId },
+                    TextFieldChat(if (replyId == null) null else messages.firstOrNull { user -> user.id == replyId },
                         user,
                         onReplyCancel = {
                             viewModel.reply.value = null
                         },
-                        onRecord = { viewModel.requestRecord() }, onFileRequest = {
+                        onRecord = { viewModel.requestRecord() },
+                        onFileRequest = {
                             viewModel.getMedias()
                             filePopupShow = true
-                        }, onSendFile = { files ->
+                        },
+                        room = room,
+                        onSendFile = { files ->
                             viewModel.reply.value = null
-                            viewModel.setMessages(
-                                messages.toMutableList().apply {
-                                    add(
-                                        MessageModel(
-                                            "",
-                                            from = CurrentUser.token ?: "",
-                                            replyToId = replyId,
-                                            files = files
-                                        )
-                                    )
-                                }
-                            )
                             viewModel.addMessage("", files)
+                        },
+                        showKeyboard = showKeyboard,
+                        showEmojiKeyboard = showEmojiKeyboard,
+                        onKeyboardRequest = { keyboard, emojiKeyboard ->
+                            viewModel.showKeyboard.value = keyboard
+                            viewModel.showEmojiKeyboard.value = emojiKeyboard
                         }) { text ->
                         viewModel.reply.value = null
-                        viewModel.setMessages(
-                            messages.toMutableList().apply {
-                                add(
-                                    MessageModel(
-                                        text,
-                                        from = CurrentUser.token ?: "",
-                                        replyToId = replyId
-                                    )
-                                )
-                            }
-                        )
                         viewModel.addMessage(text)
                     }
                 }
@@ -238,20 +240,17 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
         }
     }, topBar = {
         Box {
-            AppBarChat(user = user, {
+            AppBarChat(user = user, status = status, {
                 navigation.popBackStack()
             }) {
                 navigation.navigate(ChatPages.ProfileScreen.route)
             }
             AnimatedVisibility(
-                visible = selectedList.isNotEmpty(),
-                enter = fadeIn(),
-                exit = fadeOut()
+                visible = selectedList.isNotEmpty(), enter = fadeIn(), exit = fadeOut()
             ) {
                 SmallTopAppBar(title = {
                     TextChangeAnimationCounter(
-                        text = selectedList.size.toString(),
-                        style = LocalTextStyle.current
+                        text = selectedList.size.toString(), style = LocalTextStyle.current
                     )
                 }, navigationIcon = {
                     IconButton(onClick = {
@@ -259,35 +258,33 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                     }) {
                         Icon(imageVector = Icons.Rounded.Close, contentDescription = "close")
                     }
-                },
-                    actions = {
-                        IconButton(onClick = {
-                            viewModel.copyMessages(selectedList)
-                            viewModel.selectedList.value = emptyList()
-                        }) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.baseline_content_copy_24),
-                                contentDescription = null
-                            )
-                        }
-                        IconButton(onClick = {
-                            viewModel.selectedList.value = emptyList()
-                        }) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_forward),
-                                contentDescription = null
-                            )
-                        }
-                        IconButton(onClick = {
-                            viewModel.deleteMessages(selectedList)
-                            viewModel.selectedList.value = emptyList()
-                        }) {
-                            Icon(
-                                imageVector = Icons.Outlined.Delete,
-                                contentDescription = null
-                            )
-                        }
-                    })
+                }, actions = {
+                    IconButton(onClick = {
+                        viewModel.copyMessages(selectedList)
+                        viewModel.selectedList.value = emptyList()
+                    }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.baseline_content_copy_24),
+                            contentDescription = null
+                        )
+                    }
+                    IconButton(onClick = {
+                        viewModel.selectedList.value = emptyList()
+                    }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_forward),
+                            contentDescription = null
+                        )
+                    }
+                    IconButton(onClick = {
+                        viewModel.deleteMessages(selectedList)
+                        viewModel.selectedList.value = emptyList()
+                    }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete, contentDescription = null
+                        )
+                    }
+                })
             }
         }
     }, floatingActionButton = {
@@ -309,7 +306,8 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                         }, contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowDown, contentDescription = "down"
+                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = "down"
                     )
                 }
             }
@@ -330,13 +328,12 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
 
                     Constants.MUSIC -> {
                         viewModel.playOrPauseMusicWithCache(
-                            pair.second,
-                            CurrentUser.token == pair.first.from,
-                            true
+                            pair.second, CurrentUser.token == pair.first.from, true
                         )
                     }
                 }
-            }, playingMusic = currentMusic ?: Uri.EMPTY,
+            },
+            playingMusic = currentMusic ?: Uri.EMPTY,
             currentPosition = currentTimePlayingAudio,
             selectedList = selectedList,
             onMessageEvent = {
@@ -373,19 +370,22 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                             e.printStackTrace()
                         }
                     }
+
                     is MessageEvents.CancelDownload -> {
                         viewModel.cancelDownload(it.path)
                     }
+
                     is MessageEvents.DownloadFile -> {
                         viewModel.downloadFile(it.path)
                     }
                 }
             },
-            to = user
+            to = user,
+            downloadFiles = downloadFiles,
+            uploadFiles = uploadFiles,
         )
     }
-    MessagePopUp(
-        offset = popUpChat,
+    MessagePopUp(offset = popUpChat,
         context,
         popUpChat != Offset.Zero,
         selectedMessage,
@@ -421,21 +421,12 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
         }
         viewModel.setEmoji(selectedMessage, it)
     }
-    FileSelectorBottomSheet(show = filePopupShow, viewModel = viewModel, onDismissRequest = {
-        filePopupShow = false
-    }) { caption, files ->
-        viewModel.setMessages(
-            messages.toMutableList().apply {
-                add(
-                    MessageModel(
-                        caption,
-                        files,
-                        from = CurrentUser.token ?: "",
-                        replyToId = replyId
-                    )
-                )
-            }
-        )
+    FileSelectorBottomSheet(
+        show = filePopupShow,
+        viewModel = viewModel,
+        onDismissRequest = {
+            filePopupShow = false
+        }) { caption, files ->
         viewModel.addMessage(caption, files)
     }
     ChatMediaPopUp(
@@ -450,7 +441,9 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
 }
 
 @OptIn(
-    ExperimentalAnimationApi::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class
+    ExperimentalAnimationApi::class,
+    ExperimentalFoundationApi::class,
+    ExperimentalLayoutApi::class
 )
 @SuppressLint("UnusedContentLambdaTargetStateParameter")
 @Composable
@@ -459,16 +452,16 @@ fun TextFieldChat(
     user: UserModel,
     onReplyCancel: () -> Unit,
     onSendFile: (List<FileMessage>) -> Unit,
-    onRecord: () -> Unit, onFileRequest: () -> Unit, onSend: (String) -> Unit
+    onRecord: () -> Unit,
+    room: String?,
+    showEmojiKeyboard: Boolean,
+    showKeyboard: Boolean,
+    onKeyboardRequest: (Boolean, Boolean) -> Unit,
+    onFileRequest: () -> Unit,
+    onSend: (String) -> Unit
 ) {
     var text by remember {
         mutableStateOf("")
-    }
-    var showKeyboard by remember {
-        mutableStateOf(true)
-    }
-    var showEmojiKeyboard by remember {
-        mutableStateOf(false)
     }
     val imeVisible = WindowInsets.isImeVisible
     val ime = WindowInsets.imeAnimationTarget
@@ -478,7 +471,7 @@ fun TextFieldChat(
     }
     if (showEmojiKeyboard) {
         BackHandler {
-            showEmojiKeyboard = false
+            onKeyboardRequest.invoke(false, false)
         }
     }
     LaunchedEffect(key1 = imeVisible) {
@@ -487,7 +480,7 @@ fun TextFieldChat(
         }
     }
     DisposableEffect(key1 = Unit) {
-        onDispose { showKeyboard = false }
+        onDispose { onKeyboardRequest.invoke(false, false) }
     }
     val surfaceColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
     Column(
@@ -506,7 +499,11 @@ fun TextFieldChat(
             Column {
                 Row(
                     modifier = Modifier
-                        .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp))
+                        .background(
+                            MaterialTheme.colorScheme.surfaceColorAtElevation(
+                                1.dp
+                            )
+                        )
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
                         .height(56.dp),
@@ -533,8 +530,7 @@ fun TextFieldChat(
                         Text(
                             text = replyMessage?.message ?: "",
                             maxLines = 1,
-                            modifier = Modifier
-                                .fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth(),
                             overflow = TextOverflow.Ellipsis
                         )
                     }
@@ -550,8 +546,7 @@ fun TextFieldChat(
         ) {
             Box(modifier = Modifier.height(64.dp), contentAlignment = Alignment.Center) {
                 IconButton(onClick = {
-                    showKeyboard = false
-                    showEmojiKeyboard = showEmojiKeyboard.not()
+                    onKeyboardRequest.invoke(false, showEmojiKeyboard.not())
                 }) {
                     Icon(
                         painter = painterResource(id = R.drawable.outline_insert_emoticon_24),
@@ -559,7 +554,8 @@ fun TextFieldChat(
                     )
                 }
             }
-            StickerTextField(value = text,
+            StickerTextField(
+                value = text,
                 onValueChanged = {
                     text = it
                 },
@@ -574,93 +570,112 @@ fun TextFieldChat(
                     onSendFile.invoke(
                         listOf(
                             FileMessage(
-                                it.toString(),
-                                it.toString(),
-                                type = Constants.STICKER
+                                it.toString(), it.toString(), type = Constants.STICKER
                             )
                         )
                     )
                 },
                 onFocusChanged = {
-                    showKeyboard = it
-                    if (it) showEmojiKeyboard = false
-                })
+                    onKeyboardRequest.invoke(it, false)
+                }, enabled = room != null
+            )
             Box(modifier = Modifier.height(64.dp), contentAlignment = Alignment.Center) {
-                AnimatedContent(targetState = text.isEmpty(), label = "", transitionSpec = {
+                AnimatedContent(targetState = when {
+                    room == null -> 1
+                    text.isEmpty() -> 2
+                    else -> 3
+                }, label = "", transitionSpec = {
                     fadeIn() with fadeOut()
                 }) {
-                    if (it) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(onClick = {
-                                showKeyboard = false
-                                showEmojiKeyboard = false
-                                onFileRequest.invoke()
-                            }) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.round_attach_file_24),
-                                    contentDescription = "file",
-                                    modifier = Modifier.rotate(45f)
-                                )
-                            }
-                            Surface(
-                                modifier = Modifier
-                                    .padding(end = 4.dp)
-                                    .size(40.0.dp),
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
+                    when (it) {
+                        1 -> {
+                            CircularProgressIndicator()
+                        }
+
+                        2 -> {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .combinedClickable(onLongClick = onRecord, onClick = {}),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                                IconButton(onClick = {
+                                    onKeyboardRequest.invoke(false, false)
+                                    onFileRequest.invoke()
+                                }) {
                                     Icon(
-                                        painter = painterResource(id = R.drawable.round_mic_none_24),
-                                        contentDescription = "microphone",
+                                        painter = painterResource(id = R.drawable.round_attach_file_24),
+                                        contentDescription = "file",
+                                        modifier = Modifier.rotate(45f)
                                     )
+                                }
+                                Surface(
+                                    modifier = Modifier
+                                        .padding(end = 4.dp)
+                                        .size(40.0.dp),
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surfaceColorAtElevation(
+                                        1.dp
+                                    ),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .combinedClickable(
+                                                onLongClick = onRecord,
+                                                onClick = {}),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.round_mic_none_24),
+                                            contentDescription = "microphone",
+                                        )
+                                    }
                                 }
                             }
                         }
-                    } else {
-                        IconButton(onClick = {
-                            onSend.invoke(text)
-                            text = ""
-                            showKeyboard = false
-                        }) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.round_send_24),
-                                contentDescription = "send",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+
+                        else -> {
+                            IconButton(onClick = {
+                                onSend.invoke(text)
+                                text = ""
+                                onKeyboardRequest.invoke(false, false)
+                            }) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.round_send_24),
+                                    contentDescription = "send",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
-        EmojiKeyboard(visible = showEmojiKeyboard && showKeyboard.not(),
-            keyboardSize = heightKeyboard,
-            placeHolder = stringResource(R.string.search),
-            text = text,
-            onDelete = {
-                try {
-                    text = text.removeRange(text.length.minus(1), text.length)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }) {
-            text += it
+            EmojiKeyboard(visible = showEmojiKeyboard && showKeyboard.not(),
+                keyboardSize = heightKeyboard,
+                placeHolder = stringResource(R.string.search),
+                text = text,
+                onDelete = {
+                    try {
+                        text = text.removeRange(text.length.minus(1), text.length)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }) {
+                text += it
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppBarChat(user: UserModel, onBack: () -> Unit, onProfileClick: () -> Unit) {
+fun AppBarChat(
+    user: UserModel,
+    status: UserStatus?,
+    onBack: () -> Unit,
+    onProfileClick: () -> Unit
+) {
     val appBarColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+    val context = LocalContext.current
     SmallTopAppBar(title = {
         Row(modifier = Modifier
             .padding(start = 4.dp)
@@ -683,7 +698,7 @@ fun AppBarChat(user: UserModel, onBack: () -> Unit, onProfileClick: () -> Unit) 
                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp)
                 )
                 Text(
-                    text = "Connecting...",
+                    text = status?.getText(context) ?: stringResource(id = R.string.connecting),
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.alpha(0.7f)
                 )

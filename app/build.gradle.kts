@@ -77,7 +77,8 @@ dependencies {
 
     // coil
     implementation("io.coil-kt:coil-compose:2.4.0")
-    implementation("io.coil-kt:coil-gif:2.1.0")
+    implementation("io.coil-kt:coil-gif:2.4.0")
+    implementation("io.coil-kt:coil-video:2.4.0")
 
     // constraint layout
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
@@ -133,11 +134,12 @@ dependencies {
     // firebase
     implementation("com.google.firebase:firebase-database-ktx:20.2.2")
     implementation("com.google.firebase:firebase-storage-ktx:20.2.1")
-    implementation("com.google.firebase:firebase-firestore-ktx:24.7.0")
+    implementation("com.google.firebase:firebase-firestore-ktx:24.7.1")
+    implementation("com.google.firebase:firebase-messaging-ktx:23.2.1")
 
     // room
     val roomVersion = "2.5.2"
     implementation("androidx.room:room-runtime:$roomVersion")
-    annotationProcessor("androidx.room:room-compiler:$roomVersion")
     kapt("androidx.room:room-compiler:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
 }

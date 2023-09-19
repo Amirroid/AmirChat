@@ -69,6 +69,11 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     @Inject
     lateinit var authManager: AuthManager
+
+    override fun onStart() {
+        authManager.setUserOnline(true)
+        super.onStart()
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -89,6 +94,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStop() {
+        authManager.setUserOnline(false)
+        super.onStop()
     }
 }
 
