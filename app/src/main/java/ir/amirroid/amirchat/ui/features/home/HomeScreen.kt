@@ -4,7 +4,10 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -19,6 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
@@ -28,10 +33,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallTopAppBar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -51,6 +58,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -64,10 +73,13 @@ import com.google.gson.Gson
 import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.models.chat.ChatRoom
 import ir.amirroid.amirchat.data.models.register.CurrentUser
+import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.ui.components.ChatPopUp
+import ir.amirroid.amirchat.ui.components.TextChangeAnimationCounter
 import ir.amirroid.amirchat.ui.components.UserListItem
 import ir.amirroid.amirchat.utils.ChatPages
 import ir.amirroid.amirchat.utils.id
+import ir.amirroid.amirchat.utils.startLongPress
 import ir.amirroid.amirchat.viewmodels.home.HomeViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -81,10 +93,14 @@ fun HomeScreen(
     val statusBarColor = MaterialTheme.colorScheme.surfaceColorAtElevation(
         1.dp
     )
-    val profileImage by viewModel.image.collectAsStateWithLifecycle(initialValue = "")
-    val phoneNumber by viewModel.mobile.collectAsStateWithLifecycle(initialValue = "")
-    val firstName by viewModel.firstName.collectAsStateWithLifecycle(initialValue = "")
-    val lastName by viewModel.lastName.collectAsStateWithLifecycle(initialValue = "")
+    val connecting by viewModel.connecting.collectAsStateWithLifecycle()
+    val numbersOfChats by viewModel.numbersOfChats.collectAsStateWithLifecycle()
+    val user by viewModel.user.collectAsStateWithLifecycle(initialValue = UserModel())
+    val selectedRooms = viewModel.selectedRooms
+    val profileImage = user?.profilePictureUrl
+    val phoneNumber = user?.mobileNumber
+    val firstName = user?.firstName
+    val lastName = user?.lastName
     val rooms by viewModel.rooms.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -96,6 +112,7 @@ fun HomeScreen(
     var popUpChatRoom by remember {
         mutableStateOf<ChatRoom?>(null)
     }
+    val hapticFeedback = LocalHapticFeedback.current
     val showChatPopUp by remember {
         derivedStateOf { popUpChatRoom != null }
     }
@@ -110,8 +127,8 @@ fun HomeScreen(
             DrawerContent(
                 widthDpDrawer,
                 context,
-                profileImage,
-                phoneNumber,
+                profileImage ?: "",
+                phoneNumber ?: "",
                 "$firstName $lastName"
             )
         },
@@ -128,7 +145,7 @@ fun HomeScreen(
             topBar = {
                 CenterAlignedTopAppBar(
                     title = {
-                        Text(text = stringResource(id = R.string.app_name))
+                        Text(text = stringResource(id = if (connecting) R.string.connecting else R.string.app_name))
                     },
                     navigationIcon = {
                         IconButton(onClick = {
@@ -150,6 +167,38 @@ fun HomeScreen(
                         containerColor = statusBarColor
                     )
                 )
+                AnimatedVisibility(
+                    visible = selectedRooms.isNotEmpty(), enter = fadeIn(), exit = fadeOut()
+                ) {
+                    SmallTopAppBar(title = {
+                        TextChangeAnimationCounter(
+                            text = selectedRooms.size.toString(), style = LocalTextStyle.current
+                        )
+                    },
+                        colors = TopAppBarDefaults.smallTopAppBarColors(
+                            containerColor = statusBarColor
+                        ), navigationIcon = {
+                            IconButton(onClick = {
+                                viewModel.selectedRooms.clear()
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = "close"
+                                )
+                            }
+                        }, actions = {
+                            IconButton(onClick = {
+                                selectedRooms.forEach {
+                                    viewModel.deleteRoom(it)
+                                }
+                                viewModel.selectedRooms.clear()
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Delete, contentDescription = null
+                                )
+                            }
+                        })
+                }
             },
             modifier = Modifier.offset(
                 x = with(density) {
@@ -165,19 +214,32 @@ fun HomeScreen(
             ) {
                 items(rooms.size) {
                     val room = rooms[it]
-                    UserListItem(room = room, density = density, onDelete = {
-                        viewModel.deleteRoom(room)
-                    }, onClick = {
-                        val toUser = if (room.from.token == CurrentUser.token) {
-                            room.to
-                        } else room.from
-                        navigation.navigate(
-                            ChatPages.ChatScreen.route + "?id=" + room.id + "&user=" + Gson().toJson(
-                                toUser
+                    UserListItem(
+                        room = room,
+                        density = density,
+                        numbers = numbersOfChats[room.id] ?: 0,
+                        onDelete = {
+                            viewModel.deleteRoom(room)
+                        },
+                        onClick = {
+                            val toUser = if (room.from.token == CurrentUser.token) {
+                                room.to
+                            } else room.from
+                            navigation.navigate(
+                                ChatPages.ChatScreen.route + "?id=" + room.id + "&user=" + Gson().toJson(
+                                    toUser
+                                )
                             )
-                        )
-                    }, modifier= Modifier.animateItemPlacement()) {
+                        },
+                        modifier = Modifier.animateItemPlacement(),
+                        selected = selectedRooms.contains(room),
+                        selectionMode = selectedRooms.isNotEmpty(),
+                        onLongClick = {
+                            viewModel.toggleRoom(room)
+                            hapticFeedback.startLongPress()
+                        }) {
                         popUpChatRoom = room
+                        hapticFeedback.startLongPress()
                     }
                 }
             }
@@ -217,7 +279,10 @@ fun DrawerContent(
                     model = ImageRequest.Builder(context)
                         .data(image)
                         .crossfade(true)
+                        .placeholder(R.drawable.user_default)
+                        .error(R.drawable.user_default)
                         .diskCachePolicy(CachePolicy.ENABLED)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
                         .crossfade(500)
                         .build(),
                     contentDescription = "profile",

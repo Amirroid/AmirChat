@@ -11,4 +11,7 @@ import kotlinx.coroutines.flow.Flow
 interface SendingMessagesDao : BaseDao<MessageModel> {
     @Query("SELECT * FROM ${Constants.SENDING_MESSAGES} WHERE chatRoom == :room")
     fun getAll(room:String) : Flow<List<MessageModel>>
+
+    @Query("SELECT * FROM ${Constants.SENDING_MESSAGES}")
+    fun getAll() : List<MessageModel>
 }

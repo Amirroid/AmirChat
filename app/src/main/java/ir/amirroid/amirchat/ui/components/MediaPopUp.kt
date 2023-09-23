@@ -15,10 +15,12 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -323,7 +325,8 @@ fun MediaPopUp(
     offset: Offset,
     mediaContent: @Composable (Boolean) -> Unit,
     overlyContent: @Composable () -> Unit,
-    onDismissRequest: () -> Unit
+    onClick: (() -> Unit)? = null,
+    onDismissRequest: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -363,6 +366,7 @@ fun MediaPopUp(
             crop = show
         }
         if (show) {
+            delay(200)
             launch {
                 offsetAnimateX.snapTo(offset.x)
                 offsetAnimateY.snapTo(offset.y - statusBarHeight)
@@ -381,6 +385,9 @@ fun MediaPopUp(
             launch { heightAnimation.animateTo(size.height) }
         }
     }
+    val ins = remember {
+        MutableInteractionSource()
+    }
     if (showPopUp) Popup(
         properties = PopupProperties(focusable = true, dismissOnBackPress = true),
         onDismissRequest = onDismissRequest
@@ -389,61 +396,66 @@ fun MediaPopUp(
             AnimatedVisibility(
                 visible = show, enter = fadeIn(tween(300)), exit = fadeOut(tween(300))
             ) {
-                Box(modifier = Modifier
-                    .fillMaxSize()
-                    .background(backgroundColor.value)
-                    .pointerInput(Unit) {
-                        detectTapGestures { onDismissRequest.invoke() }
-                    })
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(backgroundColor.value)
+                )
             }
-            Box(modifier = Modifier
-                .draggable(rememberDraggableState {
-                    scope.launch {
-                        offsetAnimateY.snapTo(offsetAnimateY.value.plus(it))
-                        launch {
-                            if (abs(offsetAnimateY.value) > height * 0.12f) {
-                                if (backgroundColor.value != Color.Black.copy(0.6f)) {
-                                    backgroundColor.animateTo(Color.Black.copy(0.6f))
-                                }
-                            } else {
-                                if (backgroundColor.value != Color.Black) {
-                                    backgroundColor.animateTo(Color.Black)
-                                }
+        }
+        Box(modifier = Modifier
+            .clickable(
+                ins,
+                null,
+            ) {
+                onClick?.invoke()
+            }
+            .draggable(rememberDraggableState {
+                scope.launch {
+                    offsetAnimateY.snapTo(offsetAnimateY.value.plus(it))
+                    launch {
+                        if (abs(offsetAnimateY.value) > height * 0.12f) {
+                            if (backgroundColor.value != Color.Black.copy(0.6f)) {
+                                backgroundColor.animateTo(Color.Black.copy(0.6f))
+                            }
+                        } else {
+                            if (backgroundColor.value != Color.Black) {
+                                backgroundColor.animateTo(Color.Black)
                             }
                         }
                     }
-                }, Orientation.Vertical, onDragStopped = {
-                    if (abs(offsetAnimateY.value) > height * 0.12f) {
-                        onDismissRequest.invoke()
-                    } else {
-                        scope.launch {
-                            offsetAnimateY.animateTo(0f)
-                        }
+                }
+            }, Orientation.Vertical, onDragStopped = {
+                if (abs(offsetAnimateY.value) > height * 0.12f) {
+                    onDismissRequest.invoke()
+                } else {
+                    scope.launch {
+                        offsetAnimateY.animateTo(0f)
                     }
-                })
-                .offset {
-                    IntOffset(
-                        offsetAnimateX.value.toInt(), offsetAnimateY.value.toInt()
-                    )
                 }
-                .size(Size(widthAnimation.value, heightAnimation.value).toDpSize(density))
-                .clipToBounds(), contentAlignment = Alignment.Center) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clipToBounds(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    mediaContent.invoke(crop)
-                }
+            })
+            .offset {
+                IntOffset(
+                    offsetAnimateX.value.toInt(), offsetAnimateY.value.toInt()
+                )
             }
-            AnimatedVisibility(
-                visible = show,
-                enter = fadeIn(tween(200)),
-                exit = fadeOut(tween(200))
+            .size(Size(widthAnimation.value, heightAnimation.value).toDpSize(density))
+            .clipToBounds(), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clipToBounds(),
+                contentAlignment = Alignment.Center
             ) {
-                overlyContent.invoke()
+                mediaContent.invoke(crop)
             }
+        }
+        AnimatedVisibility(
+            visible = show,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(200))
+        ) {
+            overlyContent.invoke()
         }
     }
 }

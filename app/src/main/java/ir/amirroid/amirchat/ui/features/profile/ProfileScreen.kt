@@ -2,6 +2,8 @@ package ir.amirroid.amirchat.ui.features.profile
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ImageButton
@@ -9,9 +11,13 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.cardview.widget.CardView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,6 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,29 +53,53 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.constraintlayout.motion.widget.MotionLayout
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil.ImageLoader
 import coil.load
+import com.google.gson.Gson
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.models.register.UserModel
+import ir.amirroid.amirchat.ui.components.SpannableText
 import ir.amirroid.amirchat.ui.components.SwitchText
 import ir.amirroid.amirchat.utils.ChatPages
+import ir.amirroid.amirchat.utils.getName
+import ir.amirroid.amirchat.utils.id
 import ir.amirroid.amirchat.utils.setTint
+import ir.amirroid.amirchat.viewmodels.profile.ProfileViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 
 @SuppressLint("InflateParams")
 @Composable
-fun ProfileScreen(navigation: NavController) {
+fun ProfileScreen(navigation: NavController, user: UserModel) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val iconColor = MaterialTheme.colorScheme.onBackground
     val surfaceColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
     val primaryColor = MaterialTheme.colorScheme.primary
     val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
     val backgroundColor = MaterialTheme.colorScheme.background
+    val viewModel: ProfileViewModel = hiltViewModel()
+    val status by viewModel.status.collectAsStateWithLifecycle()
+    val connectingText = stringResource(id = R.string.connecting)
+    val room by viewModel.room.collectAsStateWithLifecycle()
+    LaunchedEffect(key1 = user) {
+        viewModel.observeToStatus(user.token)
+        viewModel.connectToRooms(user)
+    }
+    val layout = remember {
+        LayoutInflater.from(context).inflate(R.layout.profile_screen, null) as MotionLayout
+    }
+    LaunchedEffect(key1 = status) {
+        withContext(Dispatchers.Main) {
+            val statusText = layout.findViewById<TextView>(R.id.id_text)
+            statusText.text = status?.getText(context) ?: connectingText
+        }
+    }
     AndroidView(
         {
-            val layout: MotionLayout = LayoutInflater.from(context)
-                .inflate(R.layout.profile_screen, null) as MotionLayout
             layout.jumpToState(R.id.end)
             val backIcon = layout.findViewById<ImageButton>(R.id.back)
             val surface = layout.findViewById<View>(R.id.surface)
@@ -78,7 +109,7 @@ fun ProfileScreen(navigation: NavController) {
             val boxInfo = layout.findViewById<ComposeView>(R.id.box_info)
 //            val textInfo = layout.findViewById<TextView>(R.id.text_info)
 //            val bioUser = layout.findViewById<TextView>(R.id.bio_user)
-//            val usernameTextViewUser = layout.findViewById<TextView>(R.id.username)
+            val name = layout.findViewById<TextView>(R.id.name)
 //            val usernameTextView = layout.findViewById<TextView>(R.id.username_text)
 //            val bioTextView = layout.findViewById<TextView>(R.id.bio)
             val call = layout.findViewById<ImageView>(R.id.call)
@@ -89,6 +120,11 @@ fun ProfileScreen(navigation: NavController) {
 //            bioTextView.setTextColor(iconColor.toArgb())
 //            usernameTextView.setTextColor(iconColor.toArgb())
 //            usernameTextViewUser.setTextColor(iconColor.toArgb())
+            name.text = user.getName()
+            imageProfile.load(user.profilePictureUrl) {
+                placeholder(R.drawable.user_default)
+                error(R.drawable.user_default)
+            }
             boxInfo.setBackgroundColor(backgroundColor.toArgb())
             backIcon.setTint(iconColor.toArgb())
 //            qrCodeButton.setTint(iconColor.toArgb())
@@ -97,8 +133,16 @@ fun ProfileScreen(navigation: NavController) {
             call.setTint(iconColor.toArgb())
             surface.setBackgroundColor(surfaceColor.toArgb())
             fab.setCardBackgroundColor(primaryColor.toArgb())
+            fab.setOnClickListener {
+                if (navigation.previousBackStackEntry?.arguments?.getString("id") == room?.id){
+                    navigation.popBackStack()
+                }else{
+                    navigation.navigate(
+                        ChatPages.ChatScreen.route + "?id=" + room?.id + "&user=" + Gson().toJson(user)
+                    )
+                }
+            }
             fabImage.setTint(onPrimaryColor.toArgb())
-            imageProfile.load("https://www.alamto.com/wp-content/uploads/2023/05/flower-9.jpg")
             boxInfo.setContent {
                 Surface(
                     color = MaterialTheme.colorScheme.background,
@@ -113,45 +157,22 @@ fun ProfileScreen(navigation: NavController) {
                             style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.primary),
                             modifier = Modifier.padding(top = 12.dp, start = 12.dp)
                         )
-                        Column(
-                            modifier = Modifier
-                                .padding(top = 8.dp)
-                                .fillMaxWidth()
-                                .clickable {
+                        Row(modifier = Modifier
+                            .padding(top = 8.dp)
+                            .fillMaxWidth()
+                            .clickable {
 
-                                }
-                                .focusable(false)
-                                .padding(vertical = 12.dp, horizontal = 12.dp)
-                        ) {
-                            Text(
-                                text = "Amirreza Gholami bio",
-                            )
-                            Text(
-                                text = stringResource(id = R.string.bio),
-                                style = MaterialTheme.typography.labelMedium,
-                                modifier = Modifier
-                                    .alpha(0.6f)
-                                    .padding(top = 4.dp)
-                            )
-                        }
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-
-                                }
-                                .padding(vertical = 12.dp, horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                            ) {
+                            }
+                            .focusable(false)
+                            .padding(vertical = 12.dp, horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column {
                                 Text(
-                                    text = "@Amirreza",
+                                    text = "@" + user.userId,
                                 )
                                 Text(
-                                    text = stringResource(id = R.string.bio),
+                                    text = stringResource(id = R.string.id),
                                     style = MaterialTheme.typography.labelMedium,
                                     modifier = Modifier
                                         .alpha(0.6f)
@@ -159,12 +180,39 @@ fun ProfileScreen(navigation: NavController) {
                                 )
                             }
                             IconButton(onClick = {
-                                navigation.navigate(ChatPages.QrCodeProfileScreen.route)
+                                navigation.navigate(
+                                    ChatPages.QrCodeProfileScreen.route + "?user=" + Gson().toJson(
+                                        user
+                                    )
+                                )
                             }) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.round_qr_code_24),
                                     contentDescription = null,
                                     tint = primaryColor
+                                )
+                            }
+                        }
+                        if (user.bio.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                SpannableText(
+                                    text = user.bio, color = MaterialTheme.colorScheme.onBackground
+                                ) { link, isUser ->
+                                    if (isUser) {
+
+                                    } else {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link))
+                                        context.startActivity(intent)
+                                    }
+                                }
+                                Text(
+                                    text = stringResource(id = R.string.bio),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    modifier = Modifier
+                                        .alpha(0.6f)
+                                        .padding(top = 4.dp)
                                 )
                             }
                         }
@@ -174,13 +222,16 @@ fun ProfileScreen(navigation: NavController) {
                                 .align(Alignment.End)
                                 .padding(vertical = 8.dp)
                         )
-                        var c by remember {
-                            mutableStateOf(false)
+
+                        AnimatedVisibility(
+                            visible = room != null,
+                            enter = expandVertically(expandFrom = Alignment.Bottom),
+
+                            ) {
+                            SwitchText(text = stringResource(id = R.string.notifications),
+                                checked = room?.myNotificationEnabled() == true,
+                                onCheckedChange = { viewModel.setMyRoomNotificationEnabled(it) })
                         }
-                        SwitchText(
-                            text = stringResource(id = R.string.notifications),
-                            checked = c,
-                            onCheckedChange = { c = it })
 
                     }
                 }

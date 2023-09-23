@@ -14,7 +14,11 @@ import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.utils.Constants
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -41,6 +45,11 @@ class AuthManager @Inject constructor(
     private val userDatabase = fireStore.collection(Constants.USERS)
     private val userStorage = storage.child(Constants.USERS)
     private val usersStatus = database.child(Constants.USERS_STATUS)
+
+
+    private val job = Job()
+    private val scope = CoroutineScope(job)
+
     fun generateCode() = (100000..999999).random()
     fun generateHashCode() = signatureHelper.getSignatures().lastOrNull() ?: ""
     fun sendCode(
@@ -68,6 +77,7 @@ class AuthManager @Inject constructor(
 
             override fun onResponse(call: Call, response: Response) {
                 val body = response.body?.string() ?: ""
+                Log.d("api_result", "sendCode: $code")
                 Log.d("api_result", "sendCode: $body")
                 onResponse.invoke()
             }
@@ -89,7 +99,6 @@ class AuthManager @Inject constructor(
         firstName: String,
         lastName: String,
         bio: String,
-        scope: CoroutineScope,
         onComplete: () -> Unit
     ) {
         val token = tokenHelper.generateToken()
@@ -110,12 +119,11 @@ class AuthManager @Inject constructor(
                             scope.launch {
                                 CurrentUser.setUser(model)
                                 tokenHelper.apply {
-                                    setToken(token)
-                                    setFirstName(firstName)
-                                    setLastName(lastName)
-                                    setImage(downloadUri.toString())
-                                    setMobile(phone)
-                                    onComplete.invoke()
+                                    setUserModel(model)
+                                    startOnline()
+                                    withContext(Dispatchers.Main){
+                                        onComplete.invoke()
+                                    }
                                 }
                             }
                         }
@@ -136,11 +144,11 @@ class AuthManager @Inject constructor(
                 CurrentUser.setUser(model)
                 scope.launch {
                     tokenHelper.apply {
-                        setToken(token)
-                        setFirstName(firstName)
-                        setLastName(lastName)
-                        setMobile(phone)
-                        onComplete.invoke()
+                        setUserModel(model)
+                        startOnline()
+                        withContext(Dispatchers.Main){
+                            onComplete.invoke()
+                        }
                     }
                 }
             }
@@ -158,31 +166,33 @@ class AuthManager @Inject constructor(
 
     fun loginWithMobile(
         mobileNumber: String,
-        scope: CoroutineScope,
         onComplete: () -> Unit
     ) {
 
         userDatabase.whereEqualTo("mobileNumber", mobileNumber).get().addOnCompleteListener {
             if (it.isSuccessful) {
-                val model = it.result.first().data
+                val model = it.result.first().toObject(UserModel::class.java)
                 scope.launch {
                     tokenHelper.apply {
-                        setToken(model["token"].toString())
-                        setFirstName(model["firstName"].toString())
-                        setLastName(model["lastName"].toString())
-                        setImage(model["profilePictureUrl"].toString())
-                        setMobile(mobileNumber)
-                        onComplete.invoke()
+                        setUserModel(model)
+                        startOnline()
+                        withContext(Dispatchers.Main){
+                            onComplete.invoke()
+                        }
                     }
                 }
             } else onComplete.invoke()
         }
     }
 
-    fun getMyUser(onComplete: () -> Unit) {
+    fun getMyUser() {
         userDatabase.document(CurrentUser.token ?: "").get().addOnSuccessListener {
-            it.toObject(UserModel::class.java)?.let { user -> CurrentUser.setUser(user) }
-            onComplete.invoke()
+            it.toObject(UserModel::class.java)?.let { user ->
+                CurrentUser.setUser(user)
+                scope.launch {
+                    tokenHelper.setUserModel(user)
+                }
+            }
             messaging.token.addOnSuccessListener { token ->
                 userDatabase.document(CurrentUser.token ?: "").update(
                     mapOf(
@@ -193,14 +203,21 @@ class AuthManager @Inject constructor(
         }
     }
 
-    fun setUserOnline(isOnline: Boolean) {
+    init {
+        startOnline()
+    }
+
+    private fun startOnline() {
         val children = hashMapOf<String, Any>(
-            Constants.ONLINE to isOnline,
-        ).apply {
-            if (isOnline.not()){
-                set(Constants.LAST_ONLINE, System.currentTimeMillis())
-            }
-        }
+            Constants.ONLINE to true,
+        )
         usersStatus.child(CurrentUser.token ?: "").updateChildren(children)
+        usersStatus.child(CurrentUser.token ?: "").onDisconnect().updateChildren(
+            mapOf(
+                Constants.ONLINE to false,
+                Constants.LAST_ONLINE to System.currentTimeMillis(),
+                "toToken" to null
+            )
+        )
     }
 }

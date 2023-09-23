@@ -18,7 +18,7 @@ data class UserStatus(
         } else {
             if (online) context.getString(
                 R.string.online
-            ) else context.getString(R.string.last_ofline_at) + lastOnline.formatDateTime()
+            ) else context.getString(R.string.last_online_at) + lastOnline.formatDateTime()
         }
     }
 }

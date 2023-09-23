@@ -46,7 +46,8 @@
     <string name="view_contact">View Contact</string>
     <string name="open_with">Open with...</string>
     <string name="online">Online</string>
-    <string name="last_ofline_at">"Last ofline at "</string>
+    <string name="last_online_at">"Last online at "</string>
     <string name="connecting">Connecting...</string>
     <string name="typing">Typing...</string>
+    <string name="user_not_found">User is not found</string>
 </resources>

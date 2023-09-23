@@ -9,6 +9,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.ExoPlayer
+import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import ir.amirroid.amirchat.R
@@ -24,10 +25,12 @@ import ir.amirroid.amirchat.data.models.media.ContactModel
 import ir.amirroid.amirchat.data.models.media.FileModel
 import ir.amirroid.amirchat.data.models.media.MediaModel
 import ir.amirroid.amirchat.data.models.media.MusicModel
+import ir.amirroid.amirchat.data.models.media.MusicModelForJson
 import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.data.repositories.FileRepository
 import ir.amirroid.amirchat.data.repositories.chats.ChatRepository
+import ir.amirroid.amirchat.data.repositories.users.UsersRepository
 import ir.amirroid.amirchat.utils.Constants
 import ir.amirroid.amirchat.utils.addAllIf
 import ir.amirroid.amirchat.utils.id
@@ -49,7 +52,8 @@ class ChatViewModel @Inject constructor(
     private val musicHelper: MusicHelper,
     private val recorderHelper: RecorderHelper,
     private val chatRepository: ChatRepository,
-    private val downloadHelper: DownloadHelper
+    private val downloadHelper: DownloadHelper,
+    private val userRepository: UsersRepository
 ) : ViewModel() {
 
     private val _chats = MutableStateFlow<List<MessageModel>>(emptyList())
@@ -104,6 +108,9 @@ class ChatViewModel @Inject constructor(
     private val _status = MutableStateFlow<UserStatus?>(null)
     val status = _status.asStateFlow()
 
+    private val _loading = MutableStateFlow(false)
+    val loading = _loading.asStateFlow()
+
     private lateinit var clipboardManager: ClipboardManager
 
     private var sendingMessages = emptyList<MessageModel>()
@@ -112,6 +119,7 @@ class ChatViewModel @Inject constructor(
 
     init {
         observeToMusicStates()
+        chatRepository.setScope(viewModelScope)
     }
 
     companion object {
@@ -131,10 +139,8 @@ class ChatViewModel @Inject constructor(
             ) { createdRoom ->
                 _room.value = createdRoom
                 chatRepository.observeToChat(createdRoom.id) {
-                    _chats.value = it.toMutableList().addAllIf(
-                        it
-                    ) { model ->
-                        any { obj -> obj.id != model.id }
+                    _chats.value = it.toMutableList().addAllIf(sendingMessages) { message ->
+                        any { model -> model.id == message.id }.not()
                     }.sortedBy { message -> message.index }
                 }
                 observeToSending()
@@ -154,8 +160,8 @@ class ChatViewModel @Inject constructor(
             chatRepository.observeToChat(room) {
                 _chats.value = it.toMutableList().addAllIf(
                     it
-                ) { model ->
-                    any { obj -> obj.id != model.id }
+                ) { message ->
+                    any { model -> model.id == message.id }.not()
                 }.sortedBy { message -> message.index }
             }
             observeToSending()
@@ -171,8 +177,8 @@ class ChatViewModel @Inject constructor(
     private fun observeToSending() = viewModelScope.launch(Dispatchers.IO) {
         chatRepository.getAllSending(_room.value?.id ?: "").collectLatest {
             sendingMessages = it
-            _chats.value = _chats.value.toMutableList().apply {
-                addAll(sendingMessages)
+            _chats.value = _chats.value.toMutableList().addAllIf(sendingMessages) { message ->
+                any { model -> model.id == message.id }.not()
             }.sortedBy { message -> message.index }
         }
     }
@@ -187,7 +193,8 @@ class ChatViewModel @Inject constructor(
                 status = Constants.SEND,
                 replyToId = reply.value,
                 index = _chats.value.size
-            )
+            ),
+            toUser.fcmToken
         ) { response ->
             uploadFiles.value = uploadFiles.value.apply {
                 this[response.url] = response
@@ -223,7 +230,29 @@ class ChatViewModel @Inject constructor(
     fun stopRecording(preview: Boolean) {
         _showRecordPreview.value = preview
         _isRecording.value = false
-        recorderHelper.stop()
+        recorderHelper.stop {
+            if (preview.not()) {
+                val musicData = MusicModelForJson(
+                    _currentRecordingPath.value.split(File.separator).last(),
+                    "Unknown",
+                    _currentRecordingPath.value,
+                    _currentTimeAudio.value,
+                    (10000L..10000000L).random(),
+                    _currentRecordingPath.value
+                )
+                addMessage(
+                    "",
+                    listOf(
+                        FileMessage(
+                            _currentRecordingPath.value,
+                            _currentRecordingPath.value,
+                            type = Constants.MUSIC,
+                            data = Gson().toJson(musicData)
+                        )
+                    )
+                )
+            }
+        }
     }
 
     fun cancelRecording() {
@@ -369,5 +398,17 @@ class ChatViewModel @Inject constructor(
 
     fun setUserStatus(userStatus: UserStatus) {
         chatRepository.setStatus(userStatus)
+    }
+
+    fun seenMessage(id: String) {
+        chatRepository.setSeen(id)
+    }
+
+    fun getUserWithId(id: String, onResponse: (UserModel?) -> Unit) {
+        _loading.value = true
+        userRepository.getUserWithId(id) {
+            _loading.value = false
+            onResponse.invoke(it)
+        }
     }
 }

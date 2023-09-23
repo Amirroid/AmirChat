@@ -7,6 +7,7 @@ import androidx.media3.common.FileTypes
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.storage.StorageReference
 import com.google.gson.Gson
@@ -23,32 +24,72 @@ import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.utils.Constants
 import ir.amirroid.amirchat.utils.divIfNotZero
+import ir.amirroid.amirchat.utils.getText
 import ir.amirroid.amirchat.utils.getType
 import ir.amirroid.amirchat.utils.id
+import ir.amirroid.amirchat.viewmodels.ChatViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.FormBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import okhttp3.Response
 import java.io.File
+import java.io.IOException
 import javax.inject.Inject
 
 class ChatRepository @Inject constructor(
-    database: DatabaseReference,
+    private val database: DatabaseReference,
     storage: StorageReference,
-    private val localData: LocalData,
+    val localData: LocalData,
     @ApplicationContext val context: Context,
-    private val sendingMessagesDao: SendingMessagesDao
+    private val sendingMessagesDao: SendingMessagesDao,
+    private val okHttpClient: OkHttpClient
 ) {
     private val rooms = database.child(Constants.ROOMS)
     private val chats = database.child(Constants.CHATS)
     private val status = database.child(Constants.USERS_STATUS)
     private val chatStorage = storage.child(Constants.CHATS)
 
+    val connecting = MutableStateFlow(true)
 
-    private val job = Job()
-    private val scope = CoroutineScope(job)
+    private lateinit var scope: CoroutineScope
+
+    fun setScope(scope1: CoroutineScope) {
+        if (this::scope.isInitialized.not()) {
+            this.scope = scope1
+            scope.launch {
+                localData.rooms.firstOrNull()?.let { roomJson ->
+                    val rooms = Gson().fromJson(roomJson, Array<ChatRoom>::class.java).toList()
+                    sendingMessagesDao.getAll().forEach { message ->
+                        addMessage(
+                            message.copy(status = Constants.SEND),
+                            rooms.filter { model -> model.id == message.chatRoom }.firstOrNull()
+                                ?.getUser()?.fcmToken ?: ""
+                        ) {
+                            ChatViewModel.uploadFiles.value =
+                                ChatViewModel.uploadFiles.value.apply {
+                                    this[it.url] = it
+                                }
+                        }
+                    }
+                }
+            }
+        } else {
+            this.scope = scope1
+        }
+    }
 
     fun observeToRooms(
         onReceive: (List<ChatRoom>) -> Unit
@@ -70,9 +111,14 @@ class ChatRepository @Inject constructor(
                 snapshot.children.map { it.getValue(ChatRoom::class.java) ?: return }.apply {
                     val list =
                         filter { it.from.token == CurrentUser.token || it.to.token == CurrentUser.token }
-                    scope.launch(Dispatchers.IO) { localData.setRooms(Gson().toJson(list)) }
+                    scope.launch(Dispatchers.IO) {
+                        if (isActive) {
+                            localData.setRooms(Gson().toJson(list))
+                        }
+                    }
                     onReceive.invoke(list)
                 }
+                connecting.value = false
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -160,19 +206,62 @@ class ChatRepository @Inject constructor(
             })
     }
 
-    fun addMessage(message: MessageModel, onFileResponse: (FileNetData) -> Unit) {
+    fun addMessage(message: MessageModel, fcmToken: String, onFileResponse: (FileNetData) -> Unit) {
         scope.launch {
             sendingMessagesDao.add(message.copy(status = Constants.SENDING))
         }
         addFiles(message.files, onFileResponse) {
             chats.child(
                 message.id
-            ).setValue(message.copy(files = it)).addOnCompleteListener {
+            ).setValue(message.copy(files = it)).addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    sendFcmMessage(fcmToken)
+                    chats.orderByChild("chatRoom").equalTo(message.chatRoom).get()
+                        .addOnSuccessListener { chatTask ->
+                            val children = chatTask.children.map { model -> model.getValue(MessageModel::class.java) }
+                            val fromCount = children.count { model->
+                                model?.from == message.chatRoom.split("-").firstOrNull()
+                            }
+                            val toCount = children.count() - fromCount
+                            rooms.child(message.chatRoom).updateChildren(
+                                mapOf(
+                                    "lastMessage" to message.getText(context),
+                                    "lastTime" to System.currentTimeMillis(),
+                                    "fromNumberOfMessages" to fromCount,
+                                    "toNumberOfMessages" to toCount
+                                )
+                            )
+                        }
+                }
                 scope.launch {
                     sendingMessagesDao.delete(message)
                 }
             }
         }
+    }
+
+    private fun sendFcmMessage(fcmToken: String) {
+        val body = FormBody.Builder()
+            .add("to", fcmToken)
+            .build()
+        val request = Request.Builder()
+            .url("https://fcm.googleapis.com/v1/projects/amir-chat-394722/messages:send")
+            .post(
+                body
+            )
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Authorization", "key=" + Constants.API_KEY_CLOUD_MESSAGING)
+            .build()
+        okHttpClient.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                Log.e("fdfdd", "onFailure: ${e.message}")
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                Log.d("fdfdd", "onFailure: ${response.body?.string()}")
+            }
+
+        })
     }
 
     fun getAllSending(room: String) = sendingMessagesDao.getAll(room)
@@ -244,6 +333,13 @@ class ChatRepository @Inject constructor(
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onCancelled(error: DatabaseError) = Unit
                 override fun onDataChange(snapshot: DataSnapshot) {
+                    snapshot.children.forEach {
+                        it.getValue(MessageModel::class.java)?.let { message ->
+                            message.files.forEach { file ->
+                                chatStorage.child(file.reference).delete()
+                            }
+                        }
+                    }
                     snapshot.ref.removeValue().addOnSuccessListener {
                         scope.launch {
                             localData.deleteRoom(room)
@@ -255,11 +351,7 @@ class ChatRepository @Inject constructor(
     }
 
     fun onDestroy() {
-        try {
-
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        database.database.goOffline()
     }
 
     fun setEmoji(id: String, emoji: String?, from: Boolean) {
@@ -280,6 +372,9 @@ class ChatRepository @Inject constructor(
     fun deleteChats(messages: List<MessageModel>) {
         messages.forEach {
             chats.child(it.id).removeValue()
+            it.files.forEach { file ->
+                chatStorage.child(file.reference).delete()
+            }
         }
     }
 
@@ -300,5 +395,44 @@ class ChatRepository @Inject constructor(
 
     fun setStatus(userStatus: UserStatus) {
         status.child(CurrentUser.token ?: "").setValue(userStatus)
+    }
+
+    fun observeToNumberOfMessages(rooms: List<ChatRoom>, onData: (Map<String, Int>) -> Unit) {
+        val numbers = HashMap<String, Int>()
+        scope.launch {
+            rooms.forEach { room ->
+                launch {
+                    localData.collectToChatsFromRoom(room.id) {
+                        val number = if (room.from.token == CurrentUser.token){
+                            room.toNumberOfMessages
+                        }else{
+                            room.fromNumberOfMessages
+                        }
+                        numbers[room.id] = (number - it.toMutableList().apply {
+                            removeIf { model ->
+                                model.status != Constants.SEEN || model.from == CurrentUser.token
+                            }
+                        }.count())
+                        Log.d(
+                            "fdgdgfd",
+                            "observeToNumberOfMessages: ${numbers[room.id]}  ${room.fromNumberOfMessages}  ${room.toNumberOfMessages}"
+                        )
+                        onData.invoke(numbers)
+                    }
+                }
+            }
+        }
+    }
+
+    fun setSeen(id: String) {
+        chats.child(id).child("status").setValue(Constants.SEEN)
+    }
+
+    fun setMyNotificationEnabled(enabled: Boolean, room: ChatRoom) {
+        if (room.from.token == CurrentUser.token) {
+            rooms.child(room.id).child("fromNotificationEnabled").setValue(enabled)
+        } else {
+            rooms.child(room.id).child("toNotificationEnabled").setValue(enabled)
+        }
     }
 }

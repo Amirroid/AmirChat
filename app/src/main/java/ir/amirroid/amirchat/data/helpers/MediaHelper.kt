@@ -65,9 +65,9 @@ class MediaHelper @Inject constructor(
             val dateAddedC = it.getColumnIndex(dateAddedP)
             do {
                 val id = it.getLong(idC)
-                val name = it.getString(nameC)
+                val name = it.getString(nameC) ?: ""
                 val duration = it.getLong(durationC)
-                val data = it.getString(dataC)
+                val data = it.getString(dataC) ?: ""
                 val dateAdded = it.getLong(dateAddedC)
                 val uriVideo = ContentUris.withAppendedId(
                     uri,
@@ -110,8 +110,8 @@ class MediaHelper @Inject constructor(
             val dateAddedC = it.getColumnIndex(dateAddedP)
             do {
                 val id = it.getLong(idC)
-                val name = it.getString(nameC)
-                val data = it.getString(dataC)
+                val name = it.getString(nameC) ?: ""
+                val data = it.getString(dataC) ?: ""
                 val dateAdded = it.getLong(dateAddedC)
                 val uriVideo = ContentUris.withAppendedId(
                     uri,
@@ -165,14 +165,14 @@ class MediaHelper @Inject constructor(
             val durationC = it.getColumnIndex(durationP)
             do {
                 val id = it.getLong(idC)
-                val name = it.getString(nameC)
-                val data = it.getString(dataC)
+                val name = it.getString(nameC) ?: ""
+                val data = it.getString(dataC) ?: ""
                 val uriMusic = ContentUris.withAppendedId(
                     uri,
                     id
                 )
                 val duration = it.getLong(durationC)
-                val artist = it.getString(artistC)
+                val artist = it.getString(artistC) ?: ""
                 list.add(
                     MusicModel(name, artist, data, duration, id, uriMusic)
                 )
@@ -222,7 +222,7 @@ class MediaHelper @Inject constructor(
             val dataC = it.getColumnIndex(dataP)
             val idC = it.getColumnIndex(idP)
             do {
-                val data = it.getString(dataC)
+                val data = it.getString(dataC) ?: ""
                 if (data.endsWith(File.separator)) continue
                 val name = it.getString(nameC) ?: ""
                 val id = it.getLong(idC)

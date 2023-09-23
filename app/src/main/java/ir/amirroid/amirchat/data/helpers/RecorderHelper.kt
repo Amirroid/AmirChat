@@ -31,32 +31,28 @@ class RecorderHelper @Inject constructor(
         }
 
     fun generatePath(): String {
-        return createFileInAppDirectory(context, System.currentTimeMillis().formatDateTimeForFile() + ".mp3")?.path
-            ?: ""
+        return createFileInAppDirectory(
+            (System.currentTimeMillis().formatDateTimeForFile() + ".mp3").trim()
+        ).path
     }
 
-    private fun createFileInAppDirectory(context: Context, fileName: String): File? {
-        val appDirectory = createCatchDirectory(context)
-        if (appDirectory != null) {
-            val file = File(appDirectory, fileName)
-            Log.d("FILE_GENERATOR", "createFileInAppDirectory: $file")
-            if (!file.exists()) file.createNewFile()
-            return file
-        }
-        return null
+    private fun createFileInAppDirectory(fileName: String): File {
+        val appDirectory = createAmirChatDirectory()
+        val file = File(appDirectory, fileName)
+        Log.d("FILE_GENERATOR", "createFileInAppDirectory: $file")
+        if (file.exists().not()) file.createNewFile()
+        return file
     }
 
-    private fun createCatchDirectory(context: Context): File? {
-        val catchDirectory = context.getExternalFilesDir(null)
-        val musicDirectory = File(catchDirectory, "Musics")
+    private fun createAmirChatDirectory(): File {
+        val amirChatDirectory = File(Environment.getExternalStorageDirectory(), "AmirChat")
+        Log.d("dsfdsds", "createAmirChatDirectory: ${amirChatDirectory.path}")
 
-        if (!musicDirectory.exists()) {
-            val directoryCreated = musicDirectory.mkdir()
-            if (!directoryCreated) {
-                // Failed to create the directory
-                return null
-            }
-        }
+        if (amirChatDirectory.exists().not()) amirChatDirectory.mkdir()
+
+        val musicDirectory = File(amirChatDirectory, "Musics")
+
+        if (musicDirectory.exists().not()) musicDirectory.mkdir()
 
         return musicDirectory
     }
@@ -75,10 +71,15 @@ class RecorderHelper @Inject constructor(
         }
     }
 
-    fun stop() {
+    fun stop(onInfo: () -> Unit) {
         try {
             mediaRecorder?.stop()
-        }catch (e:Exception){e.printStackTrace()}
+            mediaRecorder?.setOnInfoListener { _, _, _ ->
+                onInfo.invoke()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun release() {

@@ -138,7 +138,18 @@ fun getTypeForFile(type: String, context: Context): Int {
     }
 }
 
-fun getTextForStatus(status:Int, context: Context) = when(status) {
+fun getTextForFileType(type: Int, context: Context): String {
+    return when (type) {
+        Constants.GALLERY -> context.getString(R.string.gallery)
+        Constants.LOCATION -> context.getString(R.string.location)
+        Constants.CONTACT -> context.getString(R.string.contacts)
+        Constants.MUSIC -> context.getString(R.string.music)
+        Constants.FILE -> context.getString(R.string.file)
+        else -> ""
+    }
+}
+
+fun getTextForStatus(status: Int, context: Context) = when (status) {
     Constants.TYPING -> context.getString(R.string.typing)
     else -> context.getString(R.string.typing)
 }

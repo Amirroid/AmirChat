@@ -17,10 +17,21 @@ class UsersRepository @Inject constructor(
         users.get().addOnCompleteListener {
             it.result.toObjects(UserModel::class.java).apply {
                 val newData = filter { user ->
-                    user.token != CurrentUser.token && user.userId.contains(id) || user.getName()
-                        .contains(id)
+                    user.token != CurrentUser.token && (user.userId.contains(id) || user.getName()
+                        .contains(id))
                 }
                 newData.apply(onComplete)
+            }
+        }
+    }
+
+    fun getUserWithId(id: String, onResponse: (UserModel?) -> Unit) {
+        users.whereEqualTo("userId", id).get().addOnCompleteListener {
+            if (it.isSuccessful) {
+                val user = it.result.firstOrNull()?.toObject(UserModel::class.java)
+                onResponse.invoke(user)
+            } else {
+                onResponse.invoke(null)
             }
         }
     }

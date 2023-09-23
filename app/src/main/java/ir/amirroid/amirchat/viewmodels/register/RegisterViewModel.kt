@@ -100,7 +100,6 @@ class RegisterViewModel
             firstName,
             lastName,
             bio,
-            viewModelScope
         ) {
             loading = false
             onComplete.invoke()
@@ -118,6 +117,6 @@ class RegisterViewModel
     }
 
     fun logInWithMobile(onComplete: () -> Unit) {
-        authManager.loginWithMobile(phoneNumber, viewModelScope, onComplete)
+        authManager.loginWithMobile(phoneNumber, onComplete)
     }
 }

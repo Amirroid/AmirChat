@@ -11,6 +11,7 @@ import ir.amirroid.amirchat.utils.Constants
 import ir.amirroid.amirchat.utils.preferences
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
@@ -55,6 +56,14 @@ class LocalData @Inject constructor(
                 )
             }
         }
+    }
+
+
+    suspend fun getChats(roomID: String): List<MessageModel> {
+        val key = stringPreferencesKey(roomID)
+        return Gson().fromJson(dataStore.data.map {
+            it[key]
+        }.firstOrNull(), Array<MessageModel>::class.java).toList()
     }
 
     suspend fun deleteRoom(room: ChatRoom) {

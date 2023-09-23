@@ -13,4 +13,8 @@ sealed class MessageEvents {
 
     class DownloadFile(val path:String)  :MessageEvents()
     class CancelDownload(val path:String)  :MessageEvents()
+
+    class Seen(val id:String) : MessageEvents()
+
+    class OpenId(val id:String) : MessageEvents()
 }

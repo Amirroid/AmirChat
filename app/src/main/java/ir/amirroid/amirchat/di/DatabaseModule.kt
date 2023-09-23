@@ -21,7 +21,7 @@ object DatabaseModule {
         context,
         AppDatabase::class.java,
         "db"
-    ).build()
+    ).fallbackToDestructiveMigration().allowMainThreadQueries().build()
 
     @Provides
     fun provideSendingDao(

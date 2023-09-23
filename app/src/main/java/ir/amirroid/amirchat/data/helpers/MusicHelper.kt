@@ -1,8 +1,10 @@
 package ir.amirroid.amirchat.data.helpers
 
 import android.net.Uri
+import android.util.Log
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.cache.CacheDataSource
@@ -27,6 +29,11 @@ class MusicHelper @Inject constructor(
         override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
             onEvent?.invoke(playbackState)
             super.onPlayerStateChanged(playWhenReady, playbackState)
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            Log.d("dfsf", "onPlayerError: ${error.message}")
+            super.onPlayerError(error)
         }
     }
 

@@ -1,7 +1,7 @@
 package ir.amirroid.amirchat
 
-import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.EnterTransition
@@ -29,14 +29,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -49,8 +46,6 @@ import com.google.accompanist.navigation.animation.rememberAnimatedNavController
 import com.google.gson.Gson
 import dagger.hilt.android.AndroidEntryPoint
 import ir.amirroid.amirchat.data.auth.AuthManager
-import ir.amirroid.amirchat.data.helpers.TokenHelper
-import ir.amirroid.amirchat.data.models.chat.ChatRoom
 import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.ui.features.chat.ChatScreen
@@ -61,8 +56,6 @@ import ir.amirroid.amirchat.ui.features.register.RegisterScreen
 import ir.amirroid.amirchat.ui.features.search.SearchScreen
 import ir.amirroid.amirchat.ui.theme.AmirChatTheme
 import ir.amirroid.amirchat.utils.ChatPages
-import ir.amirroid.amirchat.utils.CircleShape
-import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -70,10 +63,7 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var authManager: AuthManager
 
-    override fun onStart() {
-        authManager.setUserOnline(true)
-        super.onStart()
-    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -95,34 +85,32 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-    override fun onStop() {
-        authManager.setUserOnline(false)
-        super.onStop()
-    }
 }
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun MainScreen(authManager: AuthManager) {
     val isUser = remember {
-        CurrentUser.token?.isNotEmpty() == true
+        CurrentUser.user != null
     }
     val navController = rememberAnimatedNavController()
     LaunchedEffect(key1 = isUser) {
         if (isUser) {
-            authManager.getMyUser {
-                navController.navigate(ChatPages.HomeScreen.route)
+            authManager.getMyUser()
+            navController.navigate(ChatPages.HomeScreen.route){
+                popUpTo(ChatPages.SplashScreen.route){
+                    inclusive = true
+                }
             }
         }
     }
     AnimatedNavHost(
         navController = navController,
         startDestination = if (isUser) ChatPages.SplashScreen.route else ChatPages.RegisterScreen.route,
-        enterTransition = { slideInHorizontally(tween(300)) { 200 } + fadeIn(tween(200)) },
-        exitTransition = { slideOutHorizontally(tween(300)) { -200 } + fadeOut(tween(200)) },
-        popExitTransition = { slideOutHorizontally(tween(300)) { 200 } + fadeOut(tween(200)) },
-        popEnterTransition = { slideInHorizontally(tween(300)) { -200 } + fadeIn(tween(200)) },
+        popEnterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.Hold },
+        enterTransition = { slideInHorizontally(tween(200)) { 150 } + fadeIn(tween(250)) },
+        popExitTransition = { slideOutHorizontally(tween(250)) { 150 } + fadeOut(tween(200)) },
         modifier = Modifier.fillMaxSize()
     ) {
         composable(ChatPages.SplashScreen.route) {
@@ -150,18 +138,29 @@ fun MainScreen(authManager: AuthManager) {
             val user = it.arguments?.getString("user") ?: ""
             ChatScreen(room, Gson().fromJson(user, UserModel::class.java), navController)
         }
-        composable(ChatPages.ProfileScreen.route,
+        composable(
+            ChatPages.ProfileScreen.route + "?user={user}",
             enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
             popExitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None }
+            arguments = listOf(navArgument("user") {
+                type = NavType.StringType
+                nullable = false
+            })
         )
         {
-            ProfileScreen(navController)
+            val user = it.arguments?.getString("user")
+            val userModel = Gson().fromJson(user, UserModel::class.java)
+            ProfileScreen(navController, userModel)
         }
-        composable(ChatPages.QrCodeProfileScreen.route)
+        composable(ChatPages.QrCodeProfileScreen.route + "?user={user}", arguments = listOf(
+            navArgument("user"){
+                type = NavType.StringType
+            },
+        ))
         {
-            QrCodeProfileScreen(navController)
+            val userJson = it.arguments?.getString("user") ?: ""
+            val user = Gson().fromJson(userJson, UserModel::class.java)
+            QrCodeProfileScreen(navController, user.userId, user.profilePictureUrl)
         }
         composable(ChatPages.SearchScreen.route)
         {

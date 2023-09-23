@@ -11,10 +11,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,7 +36,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,7 +74,7 @@ import ir.amirroid.amirchat.viewmodels.qr_code.QrCodeProfileViewModel
 import kotlinx.coroutines.launch
 
 @Composable
-fun QrCodeProfileScreen(navigation: NavHostController) {
+fun QrCodeProfileScreen(navigation: NavHostController, id: String, image: String?) {
     val viewModel: QrCodeProfileViewModel = hiltViewModel()
     val bitmap by viewModel.bitmap.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -97,11 +93,13 @@ fun QrCodeProfileScreen(navigation: NavHostController) {
         Animatable(0f)
     }
     DisposableEffect(key1 = Unit) {
-        viewModel.generateQrCode("Amirreza")
+        viewModel.generateQrCode(id)
         onDispose { }
     }
     AmirChatTheme(darkTheme = isDark) {
         QrCodeContent(
+            id = id,
+            image = image,
             context = context,
             bitmap = bitmap,
             navigation = navigation,
@@ -125,6 +123,8 @@ fun QrCodeProfileScreen(navigation: NavHostController) {
                     .clip(CircleShape(progressTheme.value, offsetChange))
             ) {
                 QrCodeContent(
+                    id,
+                    image,
                     context = context,
                     bitmap = bitmap,
                     navigation = navigation,
@@ -138,16 +138,23 @@ fun QrCodeProfileScreen(navigation: NavHostController) {
 
 @Composable
 fun QrCodeContent(
+    id: String,
+    image: String?,
     context: Context,
     bitmap: Bitmap?,
     navigation: NavController,
     isDark: Boolean,
     onChangeThemeRequest: (Boolean, Offset) -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         AsyncImage(
             model = ImageRequest.Builder(context).data(R.drawable.wallpaper).crossfade(true)
-                .crossfade(500).build(), contentDescription = null,
+                .crossfade(500).build(),
+            contentDescription = null,
             modifier = Modifier
                 .fillMaxSize()
                 .alpha(0.05f),
@@ -186,7 +193,7 @@ fun QrCodeContent(
                             )
                         )
                         Text(
-                            text = "@Amirreza",
+                            text = "@$id",
                             style = TextStyle(
                                 fontSize = 30.sp,
                                 fontWeight = FontWeight.Bold,
@@ -202,7 +209,9 @@ fun QrCodeContent(
                 }
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data("https://www.alamto.com/wp-content/uploads/2023/05/flower-9.jpg")
+                        .data(image)
+                        .placeholder(R.drawable.user_default)
+                        .error(R.drawable.user_default)
                         .crossfade(true).crossfade(200).build(), contentDescription = null,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
@@ -267,21 +276,32 @@ fun QrCodeContent(
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier
                             .padding(top = 8.dp)
-                            .fillMaxWidth()
-                            .height(64.dp),
+                            .fillMaxWidth(),
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.round_send_24),
                             contentDescription = null
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text(text = stringResource(id = R.string.share))
+                        Text(
+                            text = stringResource(id = R.string.share),
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
         }
-        IconButton(onClick = { navigation.popBackStack() }, modifier = Modifier.statusBarsPadding().padding(12.dp)) {
-            Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground)
+        IconButton(
+            onClick = { navigation.popBackStack() },
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.ArrowBack,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onBackground
+            )
         }
     }
 }

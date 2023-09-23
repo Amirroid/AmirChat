@@ -40,7 +40,8 @@ fun AudioRecordedPreview(
     playing: Boolean,
     onPlayRequest: (Boolean) -> Unit,
     onValueChanged: (Long) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSend:()->Unit
 ) {
     Surface(
         modifier = Modifier
@@ -98,7 +99,7 @@ fun AudioRecordedPreview(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
             }
-            IconButton(onClick = {}) {
+            IconButton(onClick = onSend) {
                 Icon(
                     imageVector = Icons.Rounded.Send,
                     contentDescription = null,

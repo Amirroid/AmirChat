@@ -108,8 +108,7 @@ fun StickerTextField(
         editText.isEnabled = enabled
     }
     DisposableEffect(key1 = Unit) {
-        editText.requestFocus()
-        keyboard.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
+        onFocusChanged.invoke(true)
         onDispose {}
     }
     LaunchedEffect(key1 = value) {

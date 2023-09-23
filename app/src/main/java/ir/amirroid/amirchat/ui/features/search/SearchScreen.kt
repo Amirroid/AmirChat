@@ -74,6 +74,7 @@ fun SearchScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Box(
             modifier = Modifier
@@ -120,6 +121,8 @@ fun SearchScreen(
                         AsyncImage(
                             model = ImageRequest.Builder(context).data(user.profilePictureUrl)
                                 .crossfade(true)
+                                .placeholder(R.drawable.user_default)
+                                .error(R.drawable.user_default)
                                 .crossfade(300).build(),
                             contentDescription = null,
                             modifier = Modifier

@@ -9,12 +9,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.models.chat.ChatRoom
 import ir.amirroid.amirchat.data.models.chat.FileMessage
+import ir.amirroid.amirchat.data.models.chat.MessageModel
 import ir.amirroid.amirchat.data.models.media.FileModel
 import ir.amirroid.amirchat.data.models.media.MediaConvertModel
 import ir.amirroid.amirchat.data.models.media.MediaModel
@@ -47,16 +50,17 @@ fun Long.formatTime(): String {
     return "${m}:$s"
 }
 
+@SuppressLint("SimpleDateFormat")
 fun Long.formatTimeHourMinute() = SimpleDateFormat("HH:mm").format(this) ?: ""
 
 @SuppressLint("SimpleDateFormat")
 fun Long.formatDateTime() =
-    SimpleDateFormat("yyyy/MM/dd - HH:ss").format(this) ?: System.currentTimeMillis().toString()
+    SimpleDateFormat("yyyy/MM/dd - HH:mm").format(this) ?: System.currentTimeMillis().toString()
 
 
 @SuppressLint("SimpleDateFormat")
 fun Long.formatDateTimeForFile() =
-    SimpleDateFormat("yyyy-MM-dd-HH:ss").format(this) ?: this.toString()
+    SimpleDateFormat("yyyy-MM-dd-HH-ss").format(this) ?: this.toString()
 
 @SuppressLint("SimpleDateFormat")
 fun Long.getMilliseconds(): String {
@@ -192,4 +196,13 @@ fun <T> MutableList<T>.addAllIf(
         }
     }
     return this.toList()
+}
+
+fun MessageModel.getText(context: Context) = when {
+    message.isEmpty() -> getTextForFileType(files.first().type, context)
+    else -> message
+}
+
+fun HapticFeedback.startLongPress() {
+    performHapticFeedback(HapticFeedbackType.LongPress)
 }
