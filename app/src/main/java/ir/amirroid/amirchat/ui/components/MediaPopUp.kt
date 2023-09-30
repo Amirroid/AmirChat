@@ -302,7 +302,10 @@ fun MediaViewer(
             videoUri = media.uri,
             modifier = Modifier.fillMaxSize(),
             onVideoEvent = onVideoEvent,
-            changePosition = changeToPosition
+            changePosition = changeToPosition,
+            play = false,
+            playPause = true
+
         )
     } else {
         AsyncImage(

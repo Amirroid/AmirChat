@@ -1,12 +1,11 @@
 package ir.amirroid.amirchat.utils
 
 import android.Manifest
-import android.app.Notification
-import android.app.NotificationManager
+import android.app.Notification.MessagingStyle
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationCompat.MessagingStyle
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import com.google.firebase.firestore.ktx.firestore
@@ -15,15 +14,11 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.Gson
 import dagger.hilt.android.AndroidEntryPoint
-import ir.amirroid.amirchat.R
-import ir.amirroid.amirchat.data.helpers.LocalData
 import ir.amirroid.amirchat.data.helpers.TokenHelper
-import ir.amirroid.amirchat.data.models.chat.ChatRoom
-import ir.amirroid.amirchat.data.models.chat.MessageModel
 import ir.amirroid.amirchat.data.models.register.CurrentUser
+import ir.amirroid.amirchat.data.models.register.UserModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -37,54 +32,31 @@ class FCMService : FirebaseMessagingService() {
     @Inject
     lateinit var tokenHelper: TokenHelper
 
-    @Inject
-    lateinit var localData: LocalData
-
     override fun onMessageReceived(message: RemoteMessage) {
-        var chats = mutableListOf<MessageModel>()
-        scope.launch {
-            val token = tokenHelper.user.firstOrNull()?.token
-            localData.apply {
-                val roomsModel = Gson().fromJson(rooms.firstOrNull(), Array<ChatRoom>::class.java)
-                roomsModel.forEach {
-                    getChats(it.id).let { messages ->
-                        chats.addAllIf(messages.filter { f -> f.from != CurrentUser.token }) { model ->
-                            contains(model)
-                        }
-                    }
-                }
-                val messagingStyle = MessagingStyle(Person.Builder().build())
-                messagingStyle.conversationTitle = getString(R.string.app_name)
-                chats.forEach { message ->
-                    val room = roomsModel.firstOrNull { it.id == message.id }
-                    val user = if (room?.from?.token == message.from) {
-                        room.from
-                    } else {
-                        room?.to
-                    }
-                    val userName = user?.getName() ?: ""
-                    val messageStyle = MessagingStyle.Message(
-                        message.getText(this@FCMService),
-                        message.date,
-                        userName
-                    )
-                    messagingStyle.addMessage(messageStyle)
-                }
-                val notification = NotificationCompat.Builder(this@FCMService)
-                    .setSubText(getString(R.string.app_name))
-                    .setStyle(messagingStyle)
-                    .build()
-                if (ActivityCompat.checkSelfPermission(
-                        this@FCMService,
-                        Manifest.permission.POST_NOTIFICATIONS
-                    ) == PackageManager.PERMISSION_GRANTED
-                ) {
-                    NotificationManagerCompat.from(this@FCMService).notify(
-                        313,
-                        notification
-                    )
-                }
+        try {
+            Log.e("dsfsfd", "onMessageReceived: start", )
+            if (message.notification != null) {
+                val user =
+                    Gson().fromJson(message.data.toString(), UserModel::class.java) ?: UserModel()
+                sendMessage(message.notification!!, user)
             }
+        }catch (e:Exception){
+            Log.e("dsfsfd", "onMessageReceived: ${e.message}", )
+        }
+    }
+
+    private fun sendMessage(notification: RemoteMessage.Notification, user: UserModel) {
+        val notification = NotificationCompat.Builder(this, Constants.NOTIF_ID)
+            .setContentTitle(notification.title)
+            .setContentText(notification.body)
+            .setGroup(user.token)
+            .build()
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            NotificationManagerCompat.from(this).notify(313, notification)
         }
     }
 

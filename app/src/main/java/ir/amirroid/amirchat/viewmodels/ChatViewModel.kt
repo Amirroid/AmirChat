@@ -9,6 +9,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.room.util.copy
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -59,7 +60,7 @@ class ChatViewModel @Inject constructor(
     private val _chats = MutableStateFlow<List<MessageModel>>(emptyList())
     val chats = _chats.asStateFlow()
 
-    val reply = MutableStateFlow<String?>(null)
+    val messageIdForReplyAndEdit = MutableStateFlow<Pair<Boolean, String>?>(null)
 
     val selectedList = MutableStateFlow(emptyList<MessageModel>())
 
@@ -184,6 +185,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun addMessage(text: String, files: List<FileMessage> = emptyList()) {
+        val reply = messageIdForReplyAndEdit.value
         chatRepository.addMessage(
             MessageModel(
                 message = text,
@@ -191,7 +193,7 @@ class ChatViewModel @Inject constructor(
                 chatRoom = _room.value?.id ?: "",
                 files = files,
                 status = Constants.SEND,
-                replyToId = reply.value,
+                replyToId = if (reply?.first == true) null else reply?.second,
                 index = _chats.value.size
             ),
             toUser.fcmToken
@@ -410,5 +412,31 @@ class ChatViewModel @Inject constructor(
             _loading.value = false
             onResponse.invoke(it)
         }
+    }
+
+    fun setReply(id: String?) {
+        if (messageIdForReplyAndEdit.value?.first != true) {
+            messageIdForReplyAndEdit.value = if (id == null) null else Pair(false, id)
+        }
+    }
+
+    fun editMessage(text: String) {
+        if (messageIdForReplyAndEdit.value?.first == true) {
+            chatRepository.editMessage(
+                text,
+                messageIdForReplyAndEdit.value?.second ?: return
+            )
+        }
+    }
+
+    fun orderForward() {
+        val order = selectedList.value.map {
+            if (it.from == CurrentUser.token) {
+                it.copy(forwardFrom = CurrentUser.user)
+            } else {
+                it.copy(forwardFrom = toUser)
+            }
+        }
+        selectedList.value = order
     }
 }

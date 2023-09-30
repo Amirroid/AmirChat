@@ -50,4 +50,7 @@
     <string name="connecting">Connecting...</string>
     <string name="typing">Typing...</string>
     <string name="user_not_found">User is not found</string>
+    <string name="edit">Edit</string>
+    <string name="forward_to">Forward To...</string>
+    <string name="forward_from">Forward from</string>
 </resources>

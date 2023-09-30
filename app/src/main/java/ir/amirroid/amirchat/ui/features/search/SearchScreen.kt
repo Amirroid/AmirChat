@@ -113,7 +113,7 @@ fun SearchScreen(
                     }
                 }
             }
-            items(users.size, key = { users[it].mobileNumber }) {
+            items(users.size, key = { users[it].userId }) {
                 val user = users[it]
                 ListItem(
                     headlineContent = { Text(text = user.getName()) },

@@ -2,6 +2,7 @@ package ir.amirroid.amirchat.ui.components
 
 import android.media.session.PlaybackState
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -12,6 +13,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -29,6 +31,8 @@ fun VideoViewBasic(
         currentPosition: Long,
         play: Boolean
     ) -> Unit,
+    play: Boolean = true,
+    playPause : Boolean =  false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -50,6 +54,11 @@ fun VideoViewBasic(
                 }
                 super.onPlayerStateChanged(playWhenReady, playbackState)
             }
+
+            override fun onPlayerError(error: PlaybackException) {
+                Log.e("voisduwi", "onPlayerError: ${error.message}", )
+                super.onPlayerError(error)
+            }
         }
     }
     LaunchedEffect(key1 = changePosition) {
@@ -64,6 +73,11 @@ fun VideoViewBasic(
             )
             delay(500)
         }
+    }
+    LaunchedEffect(key1 = play){
+        if(play){
+            exoplayer.play()
+        }else exoplayer.pause()
     }
     DisposableEffect(key1 = Unit) {
         exoplayer.setMediaItem(MediaItem.fromUri(videoUri))
@@ -86,10 +100,12 @@ fun VideoViewBasic(
         }
         playerView
     }, modifier = modifier.pointerInput(Unit) {
-        detectTapGestures {
-            if (exoplayer.isPlaying) {
-                exoplayer.pause()
-            } else exoplayer.play()
+        if (playPause){
+            detectTapGestures {
+                if (exoplayer.isPlaying) {
+                    exoplayer.pause()
+                } else exoplayer.play()
+            }
         }
     })
 }

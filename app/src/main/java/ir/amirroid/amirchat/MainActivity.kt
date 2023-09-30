@@ -1,5 +1,6 @@
 package ir.amirroid.amirchat
 
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -46,9 +47,12 @@ import com.google.accompanist.navigation.animation.rememberAnimatedNavController
 import com.google.gson.Gson
 import dagger.hilt.android.AndroidEntryPoint
 import ir.amirroid.amirchat.data.auth.AuthManager
+import ir.amirroid.amirchat.data.models.chat.ChatRoom
+import ir.amirroid.amirchat.data.models.chat.MessageModel
 import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.ui.features.chat.ChatScreen
+import ir.amirroid.amirchat.ui.features.forward.ForwardScreen
 import ir.amirroid.amirchat.ui.features.home.HomeScreen
 import ir.amirroid.amirchat.ui.features.profile.ProfileScreen
 import ir.amirroid.amirchat.ui.features.qr_code.QrCodeProfileScreen
@@ -97,8 +101,8 @@ fun MainScreen(authManager: AuthManager) {
     LaunchedEffect(key1 = isUser) {
         if (isUser) {
             authManager.getMyUser()
-            navController.navigate(ChatPages.HomeScreen.route){
-                popUpTo(ChatPages.SplashScreen.route){
+            navController.navigate(ChatPages.HomeScreen.route) {
+                popUpTo(ChatPages.SplashScreen.route) {
                     inclusive = true
                 }
             }
@@ -152,11 +156,13 @@ fun MainScreen(authManager: AuthManager) {
             val userModel = Gson().fromJson(user, UserModel::class.java)
             ProfileScreen(navController, userModel)
         }
-        composable(ChatPages.QrCodeProfileScreen.route + "?user={user}", arguments = listOf(
-            navArgument("user"){
-                type = NavType.StringType
-            },
-        ))
+        composable(
+            ChatPages.QrCodeProfileScreen.route + "?user={user}", arguments = listOf(
+                navArgument("user") {
+                    type = NavType.StringType
+                },
+            )
+        )
         {
             val userJson = it.arguments?.getString("user") ?: ""
             val user = Gson().fromJson(userJson, UserModel::class.java)
@@ -165,6 +171,14 @@ fun MainScreen(authManager: AuthManager) {
         composable(ChatPages.SearchScreen.route)
         {
             SearchScreen(navController)
+        }
+        composable(ChatPages.ForwardScreen.route + "?messages={messages}", arguments = listOf(
+            navArgument("messages") {
+                type = NavType.StringType
+            }
+        )) {
+            val argument = Gson().fromJson(it.arguments?.getString("messages") ?: "[]", Array<MessageModel>::class.java)
+            ForwardScreen(messages = argument?.toList() ?: emptyList(), navController)
         }
     }
 }

@@ -134,11 +134,13 @@ fun ProfileScreen(navigation: NavController, user: UserModel) {
             surface.setBackgroundColor(surfaceColor.toArgb())
             fab.setCardBackgroundColor(primaryColor.toArgb())
             fab.setOnClickListener {
-                if (navigation.previousBackStackEntry?.arguments?.getString("id") == room?.id){
+                if (navigation.previousBackStackEntry?.arguments?.getString("id") == room?.id) {
                     navigation.popBackStack()
-                }else{
+                } else {
                     navigation.navigate(
-                        ChatPages.ChatScreen.route + "?id=" + room?.id + "&user=" + Gson().toJson(user)
+                        ChatPages.ChatScreen.route + "?id=" + room?.id + "&user=" + Gson().toJson(
+                            user
+                        )
                     )
                 }
             }
@@ -195,7 +197,10 @@ fun ProfileScreen(navigation: NavController, user: UserModel) {
                         }
                         if (user.bio.isNotEmpty()) {
                             Column(
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp)
+                                    .clickable {}
                             ) {
                                 SpannableText(
                                     text = user.bio, color = MaterialTheme.colorScheme.onBackground

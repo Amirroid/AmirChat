@@ -121,6 +121,9 @@ fun ChatMediaPopUp(
     var play by remember {
         mutableStateOf(false)
     }
+    var changeProgress by remember {
+        mutableLongStateOf(0L)
+    }
     var progress by remember {
         mutableLongStateOf(0L)
     }
@@ -137,14 +140,14 @@ fun ChatMediaPopUp(
         }
     }
     MediaPopUp(show = show, size = size, offset = offset, mediaContent = {
-        MediaContent(message, pagerState, play, it, progress) { cProgress, cDuration, isPlay ->
+        MediaContent(message, pagerState, play, it, changeProgress) { cProgress, cDuration, isPlay ->
             progress = cProgress
             duration = cDuration
             play = isPlay
         }
         Log.d("dsfdsf", "ChatMediaPopUp: $it")
     }, onClick = {
-                 playButtonShow= playButtonShow.not()
+        playButtonShow = playButtonShow.not()
     }, overlyContent = {
         val context = LocalContext.current
         val imageLoader = ImageLoader(context)
@@ -172,13 +175,15 @@ fun ChatMediaPopUp(
                     },
                     colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color.Transparent)
                 )
-                if (message?.files?.getOrNull(pagerState.currentPage.minus(1))?.path?.getType()
+                if (message?.files?.getOrNull(pagerState.currentPage)?.path?.getType()
                         ?.startsWith("video") == true
                 ) {
                     PlayButton(
                         play = play,
                         onPlayRequest = { play = it },
-                        modifier = Modifier.size(64.dp)
+                        modifier = Modifier
+                            .size(64.dp)
+                            .align(Alignment.CenterHorizontally)
                     )
                 }
                 Column(
@@ -227,11 +232,11 @@ fun ChatMediaPopUp(
                             ),
                         )
                         AnimatedVisibility(
-                            visible = files.getOrNull(pagerState.currentPage.minus(1))?.path?.getType()
+                            visible = files.getOrNull(pagerState.currentPage)?.path?.getType()
                                 ?.startsWith("video") == true
                         ) {
                             Slider(value = progress.toFloat(), onValueChange = {
-                                progress = it.toLong()
+                                changeProgress = it.toLong()
                             }, valueRange = 0f..duration.toFloat())
                         }
                     }
@@ -265,7 +270,6 @@ fun ImagePreview(
                     imageLoader.enqueue(request)
                 }
                 val request = ImageRequest.Builder(context).data(file.path)
-                    .diskCachePolicy(CachePolicy.ENABLED)
                     .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
                 imageLoader.enqueue(request)
             } else {
@@ -273,8 +277,6 @@ fun ImagePreview(
                     bitmap = BitmapFactory.decodeFile(file.fromPath)
                 }
                 val request = ImageRequest.Builder(context).data(file.path)
-                    .diskCachePolicy(CachePolicy.ENABLED)
-                    .memoryCachePolicy(CachePolicy.ENABLED)
                     .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
                 imageLoader.enqueue(request)
             }
@@ -316,7 +318,6 @@ fun MediaContent(
             val file = files[it]
             if (file.path.getType().startsWith("video")) {
                 VideoView(
-                    context,
                     isMyFrom,
                     file,
                     onEvent,
@@ -373,74 +374,21 @@ fun ImageView(
 @Composable
 @UnstableApi
 fun VideoView(
-    context: Context,
     isMyFrom: Boolean,
     file: FileMessage,
     onEvent: (Long, Long, Boolean) -> Unit,
     play: Boolean,
     progress: Long
 ) {
-    LaunchedEffect(key1 = Unit) {
-        onEvent.invoke(0, 1, false)
-    }
     val path = if (isMyFrom && File(file.fromPath).exists()) {
         file.fromPath
     } else file.path
-    val audioAttributes = remember {
-        AudioAttributes.Builder()
-            .setUsage(C.USAGE_MEDIA)
-            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-            .build()
-    }
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context)
-            .setAudioAttributes(audioAttributes, true)
-            .build()
-            .apply {
-                setMediaSource(
-                    ProgressiveMediaSource.Factory(
-                        DefaultDataSource.Factory(context)
-                    ).createMediaSource(MediaItem.fromUri(Uri.parse(path)))
-                )
-                prepare()
-            }
-    }
-    DisposableEffect(key1 = Unit) {
-        val listener = object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                onEvent.invoke(exoPlayer.currentPosition, exoPlayer.duration, exoPlayer.isPlaying)
-                super.onPlaybackStateChanged(playbackState)
-            }
-        }
-        exoPlayer.addListener(listener)
-        onDispose {
-            exoPlayer.removeListener(listener)
-        }
-    }
-    LaunchedEffect(key1 = play) {
-        if (play) {
-            repeat(Int.MAX_VALUE) {
-                delay(1000)
-                onEvent.invoke(exoPlayer.currentPosition, exoPlayer.duration, exoPlayer.isPlaying)
-            }
-        }
-    }
-    val playerView = remember {
-        PlayerView(context).apply {
-            useController = false
-            hideController()
-            player = exoPlayer
-        }
-    }
-    LaunchedEffect(key1 = play, progress) {
-        exoPlayer.seekTo(progress)
-        if (play) {
-            exoPlayer.play()
-        } else {
-            exoPlayer.pause()
-        }
-    }
-    AndroidView(factory = {
-        playerView
-    }, modifier = Modifier.fillMaxWidth())
+    Log.d("voisduwi", "VideoView: $path")
+    VideoViewBasic(
+        videoUri = Uri.parse(path),
+        changePosition = progress,
+        onVideoEvent = { d, c, p ->
+            onEvent.invoke(c, d, p)
+        },
+        play = play)
 }

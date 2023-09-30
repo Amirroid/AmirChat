@@ -316,6 +316,20 @@ fun RowScope.MessageView(
                 )
                 .background(getColorOfMessage(isMyUser = isMyUser))
         ) {
+            if (message.forwardFrom != null) {
+                Text(
+                    text = stringResource(id = R.string.forward_from) + " " + message.forwardFrom.getName(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onMessageEvent?.invoke(MessageEvents.OpenUser(message.forwardFrom))
+                        }
+                        .padding(horizontal = 12.dp)
+                        .padding(top = 4.dp),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                )
+            }
             if (replyMessage != null) {
                 val name = if (replyMessage.from == CurrentUser.token) {
                     CurrentUser.user?.getName() ?: ""
@@ -383,7 +397,8 @@ fun RowScope.MessageView(
                     .then(
                         if (message.files.isNotEmpty()) Modifier.fillMaxWidth() else Modifier.wrapContentWidth()
                     )
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 8.dp, top = 2.dp)
             ) {
                 if (message.message.isNotEmpty()) {
                     SelectionContainer(selectionMode) {
@@ -394,7 +409,14 @@ fun RowScope.MessageView(
                         ) { text, isUser ->
                             Log.d("uhdsifhdsf", "MessageView: $text")
                             if (isUser) {
-                                onMessageEvent?.invoke(MessageEvents.OpenId(text.replaceFirst("@", "")))
+                                onMessageEvent?.invoke(
+                                    MessageEvents.OpenId(
+                                        text.replaceFirst(
+                                            "@",
+                                            ""
+                                        )
+                                    )
+                                )
                             } else {
                                 try {
                                     val i = Intent(Intent.ACTION_VIEW, Uri.parse(text))

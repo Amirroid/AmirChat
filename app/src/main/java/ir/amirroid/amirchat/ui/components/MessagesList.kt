@@ -46,7 +46,7 @@ import ir.amirroid.amirchat.utils.Constants
 @Composable
 fun MessagesList(
     lazyState: LazyListState = rememberLazyListState(),
-    messages: List<MessageModel>,
+    message: List<MessageModel>,
     modifier: Modifier = Modifier,
     showPattern: Boolean = true,
     replyEnabled: Boolean = true,
@@ -59,6 +59,7 @@ fun MessagesList(
     downloadFiles: HashMap<String, FileNetData>,
     uploadFiles: HashMap<String, FileNetData>,
 ) {
+    val messages = message.reversed()
     val context = LocalContext.current
     val configuration = context.resources.configuration
     val maxWidth = (configuration.screenWidthDp * 0.7f).dp
@@ -85,7 +86,7 @@ fun MessagesList(
                 .then(modifier)
                 .fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
-            verticalArrangement = Arrangement.Bottom,
+            reverseLayout = true,
             state = lazyState,
         ) {
             items(messages.size) {
@@ -113,13 +114,6 @@ fun MessagesList(
                         downloadFiles,
                         uploadFiles
                     )
-//                    if (animatedList.contains(message).not()) {
-//                        LaunchedEffect(Unit) {
-//                            delay(300)
-//                            animatedList.add(message)
-//                        }
-//                    }
-                    animatedList.add(message)
                 }
                 if (it != messages.size.minus(1)) {
                     Spacer(modifier = Modifier.height(12.dp))

@@ -66,7 +66,7 @@ fun MessagePopUp(
     offset: Offset,
     context: Context,
     visible: Boolean,
-    selectedMessage: MessageModel?,
+    message: MessageModel?,
     myFrom: Boolean,
     onEvent: (MessagePopUpEvent) -> Unit,
     onDismissRequest: () -> Unit,
@@ -80,6 +80,14 @@ fun MessagePopUp(
     }
     var sizeView by remember {
         mutableStateOf(IntSize.Zero)
+    }
+    var selectedMessage by remember {
+        mutableStateOf<MessageModel?>(null)
+    }
+    LaunchedEffect(key1 = message) {
+        if (message != null) {
+            selectedMessage = message
+        }
     }
     LaunchedEffect(key1 = offset, key2 = sizeView) {
         if (offset != Offset.Zero) {
@@ -176,6 +184,7 @@ fun MessagePopUp(
                         .clip(MaterialTheme.shapes.small)
                         .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp))
                 ) {
+                    val isMyUser = selectedMessage?.from == CurrentUser.token
                     DropdownMenuItem(
                         text = { Text(text = stringResource(id = R.string.reply)) },
                         onClick = { onEvent.invoke(MessagePopUpEvent.REPLY) },
@@ -196,13 +205,26 @@ fun MessagePopUp(
                         })
                     DropdownMenuItem(
                         text = { Text(text = stringResource(id = R.string.forward)) },
-                        onClick = { },
+                        onClick = { onEvent.invoke(MessagePopUpEvent.FORWARD) },
                         leadingIcon = {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_forward),
                                 contentDescription = "forward",
                             )
                         })
+                    if (isMyUser) {
+                        DropdownMenuItem(
+                            text = { Text(text = stringResource(id = R.string.edit)) },
+                            onClick = {
+                                onEvent.invoke(MessagePopUpEvent.EDIT)
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.round_edit_24),
+                                    contentDescription = "edit"
+                                )
+                            })
+                    }
                     DropdownMenuItem(
                         text = { Text(text = stringResource(id = R.string.save)) },
                         onClick = { },
@@ -212,15 +234,17 @@ fun MessagePopUp(
                                 contentDescription = "save"
                             )
                         })
-                    DropdownMenuItem(
-                        text = { Text(text = stringResource(id = R.string.delete)) },
-                        onClick = { onEvent.invoke(MessagePopUpEvent.DELETE) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Outlined.Delete,
-                                contentDescription = "delete"
-                            )
-                        })
+                    if (isMyUser) {
+                        DropdownMenuItem(
+                            text = { Text(text = stringResource(id = R.string.delete)) },
+                            onClick = { onEvent.invoke(MessagePopUpEvent.DELETE) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.Delete,
+                                    contentDescription = "delete"
+                                )
+                            })
+                    }
                 }
             }
         }
@@ -230,5 +254,7 @@ fun MessagePopUp(
 enum class MessagePopUpEvent {
     DELETE,
     COPY,
-    REPLY
+    REPLY,
+    EDIT,
+    FORWARD
 }

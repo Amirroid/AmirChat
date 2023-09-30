@@ -50,6 +50,14 @@ class AuthManager @Inject constructor(
     private val job = Job()
     private val scope = CoroutineScope(job)
 
+    private var fcmToken = ""
+
+    init {
+        messaging.token.addOnSuccessListener {
+            fcmToken = it ?: ""
+        }
+    }
+
     fun generateCode() = (100000..999999).random()
     fun generateHashCode() = signatureHelper.getSignatures().lastOrNull() ?: ""
     fun sendCode(
@@ -111,7 +119,14 @@ class AuthManager @Inject constructor(
                     ref.downloadUrl.addOnSuccessListener { downloadUri ->
                         val model =
                             UserModel(
-                                token, phone, firstName, lastName, id, bio, downloadUri.toString()
+                                token,
+                                phone,
+                                firstName,
+                                lastName,
+                                id,
+                                bio,
+                                downloadUri.toString(),
+                                fcmToken
                             )
                         userDatabase.document(token).set(
                             model
@@ -121,7 +136,7 @@ class AuthManager @Inject constructor(
                                 tokenHelper.apply {
                                     setUserModel(model)
                                     startOnline()
-                                    withContext(Dispatchers.Main){
+                                    withContext(Dispatchers.Main) {
                                         onComplete.invoke()
                                     }
                                 }
@@ -136,17 +151,15 @@ class AuthManager @Inject constructor(
             val downloadUri = ""
             val model =
                 UserModel(
-                    token, phone, firstName, lastName, id, bio, downloadUri
+                    token, phone, firstName, lastName, id, bio, downloadUri, fcmToken
                 )
-            userDatabase.add(
-                model
-            ).addOnSuccessListener {
+            userDatabase.document(token).set(model).addOnSuccessListener {
                 CurrentUser.setUser(model)
                 scope.launch {
                     tokenHelper.apply {
                         setUserModel(model)
                         startOnline()
-                        withContext(Dispatchers.Main){
+                        withContext(Dispatchers.Main) {
                             onComplete.invoke()
                         }
                     }
@@ -168,15 +181,15 @@ class AuthManager @Inject constructor(
         mobileNumber: String,
         onComplete: () -> Unit
     ) {
-
         userDatabase.whereEqualTo("mobileNumber", mobileNumber).get().addOnCompleteListener {
             if (it.isSuccessful) {
                 val model = it.result.first().toObject(UserModel::class.java)
+                userDatabase.document(model.token).set(model.copy(fcmToken = fcmToken))
                 scope.launch {
                     tokenHelper.apply {
                         setUserModel(model)
                         startOnline()
-                        withContext(Dispatchers.Main){
+                        withContext(Dispatchers.Main) {
                             onComplete.invoke()
                         }
                     }

@@ -9,7 +9,7 @@ import ir.amirroid.amirchat.data.models.chat.MessageModel
     entities = [
         MessageModel::class
     ],
-    version = 2
+    version = 3
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {

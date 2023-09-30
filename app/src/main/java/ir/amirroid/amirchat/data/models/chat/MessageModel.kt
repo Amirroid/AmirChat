@@ -1,10 +1,15 @@
 package ir.amirroid.amirchat.data.models.chat
 
+import android.os.Parcelable
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.utils.Constants
+import kotlinx.parcelize.Parcelize
 
 @Entity(Constants.SENDING_MESSAGES)
+@Parcelize
 data class MessageModel(
     val message: String = "",
     val files: List<FileMessage> = emptyList(),
@@ -18,4 +23,6 @@ data class MessageModel(
     val fromEmoji: String? = null,
     val toEmoji: String? = null,
     val index: Int = 1,
-)
+    @Embedded
+    val forwardFrom: UserModel? = null
+):Parcelable

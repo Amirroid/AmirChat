@@ -51,6 +51,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -159,7 +160,7 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
         mutableStateOf(false)
     }
     val selectedList by viewModel.selectedList.collectAsStateWithLifecycle()
-    val replyId by viewModel.reply.collectAsStateWithLifecycle()
+    val replyId by viewModel.messageIdForReplyAndEdit.collectAsStateWithLifecycle()
     var popUpMedia by remember {
         mutableStateOf<Pair<MessageModel, FileMessage>?>(null)
     }
@@ -197,7 +198,7 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
     }
     LaunchedEffect(key1 = messages.size) {
         delay(200)
-        lazyState.animateScrollToItem(messages.size)
+        lazyState.animateScrollToItem(0)
         hapticFeedback.startLongPress()
     }
     val imeVisible = WindowInsets.isImeVisible
@@ -257,10 +258,11 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                             viewModel.stopRecording(preview)
                         }
                     } else {
-                        TextFieldChat(if (replyId == null) null else messages.firstOrNull { user -> user.id == replyId },
+                        TextFieldChat(selectedMessage = if (replyId == null) null else messages.firstOrNull { message -> message.id == replyId?.second },
+                            isEdit = replyId?.first == true,
                             user,
                             onReplyCancel = {
-                                viewModel.reply.value = null
+                                viewModel.messageIdForReplyAndEdit.value = null
                             },
                             onRecord = { viewModel.requestRecord() },
                             onFileRequest = {
@@ -269,7 +271,7 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                             },
                             room = generatedRoom?.id,
                             onSendFile = { files ->
-                                viewModel.reply.value = null
+                                viewModel.setReply(null)
                                 viewModel.addMessage("", files)
                             },
                             showKeyboard = showKeyboard,
@@ -277,9 +279,12 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                             onKeyboardRequest = { keyboard, emojiKeyboard ->
                                 viewModel.showKeyboard.value = keyboard
                                 viewModel.showEmojiKeyboard.value = emojiKeyboard
+                            }, onSend = { text ->
+                                viewModel.setReply(null)
+                                viewModel.addMessage(text)
                             }) { text ->
-                            viewModel.reply.value = null
-                            viewModel.addMessage(text)
+                            viewModel.messageIdForReplyAndEdit.value = null
+                            viewModel.editMessage(text)
                         }
                     }
                 }
@@ -319,6 +324,12 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                             )
                         }
                         IconButton(onClick = {
+                            viewModel.orderForward()
+                            navigation.navigate(
+                                ChatPages.ForwardScreen.route + "?messages" + Gson().toJson(
+                                    selectedList
+                                )
+                            )
                             viewModel.selectedList.value = emptyList()
                         }) {
                             Icon(
@@ -339,7 +350,7 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
             }
         }, floatingActionButton = {
             AnimatedVisibility(
-                visible = lazyState.canScrollForward,
+                visible = lazyState.canScrollBackward,
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut(),
             ) {
@@ -351,7 +362,7 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                             .fillMaxSize()
                             .clickable {
                                 scope.launch {
-                                    lazyState.animateScrollToItem(messages.size)
+                                    lazyState.animateScrollToItem(0)
                                 }
                             }, contentAlignment = Alignment.Center
                     ) {
@@ -366,7 +377,7 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
         MessagesList(
             modifier = Modifier.padding(paddingValues),
             lazyState = lazyState,
-            messages = messages,
+            message = messages,
             onContentClick = { offset, size, pair ->
                 when (pair.second.type) {
                     Constants.GALLERY -> {
@@ -392,6 +403,14 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                         viewModel.seekTo(it.position)
                     }
 
+                    is MessageEvents.OpenUser -> {
+                        navigation.navigate(
+                            ChatPages.ProfileScreen.route + "?user=" + Gson().toJson(
+                                it.user
+                            )
+                        )
+                    }
+
                     is MessageEvents.Seen -> {
                         viewModel.seenMessage(it.id)
                     }
@@ -401,7 +420,7 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                     }
 
                     is MessageEvents.Reply -> {
-                        viewModel.reply.value = it.id
+                        viewModel.setReply(it.id)
                     }
 
                     is MessageEvents.Click -> {
@@ -466,7 +485,26 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
         onEvent = {
             when (it) {
                 MessagePopUpEvent.REPLY -> {
-                    viewModel.reply.value = selectedMessage?.id ?: ""
+                    viewModel.setReply(selectedMessage?.id ?: "")
+                }
+
+                MessagePopUpEvent.FORWARD -> {
+                    val messageForReply = selectedMessage?.copy(
+                        forwardFrom = if (selectedMessage?.from == CurrentUser.token) {
+                            CurrentUser.user
+                        } else {
+                            user
+                        }
+                    )
+                    navigation.navigate(
+                        ChatPages.ForwardScreen.route + "?messages=" + Gson().toJson(
+                            listOf(messageForReply)
+                        )
+                    )
+                }
+
+                MessagePopUpEvent.EDIT -> {
+                    viewModel.messageIdForReplyAndEdit.value = Pair(true, selectedMessage?.id ?: "")
                 }
 
                 MessagePopUpEvent.COPY -> {
@@ -474,8 +512,8 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                 }
 
                 MessagePopUpEvent.DELETE -> {
-                    if (selectedMessage?.id == replyId) {
-                        viewModel.reply.value = null
+                    if (selectedMessage?.id == replyId?.second) {
+                        viewModel.messageIdForReplyAndEdit.value = null
                     }
                     viewModel.deleteMessages(listOf(selectedMessage ?: MessageModel()))
                 }
@@ -524,7 +562,8 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
 @SuppressLint("UnusedContentLambdaTargetStateParameter")
 @Composable
 fun TextFieldChat(
-    replyMessage: MessageModel?,
+    selectedMessage: MessageModel?,
+    isEdit: Boolean,
     user: UserModel,
     onReplyCancel: () -> Unit,
     onSendFile: (List<FileMessage>) -> Unit,
@@ -534,7 +573,8 @@ fun TextFieldChat(
     showKeyboard: Boolean,
     onKeyboardRequest: (Boolean, Boolean) -> Unit,
     onFileRequest: () -> Unit,
-    onSend: (String) -> Unit
+    onSend: (String) -> Unit,
+    onEdit: (String) -> Unit
 ) {
     var text by remember {
         mutableStateOf("")
@@ -565,11 +605,11 @@ fun TextFieldChat(
             .navigationBarsPadding()
     ) {
         AnimatedVisibility(
-            visible = replyMessage != null,
+            visible = selectedMessage != null,
             enter = expandVertically(expandFrom = Alignment.Top),
             exit = shrinkVertically(shrinkTowards = Alignment.Top)
         ) {
-            val name = if (replyMessage?.from == CurrentUser.token) {
+            val name = if (selectedMessage?.from == CurrentUser.token) {
                 CurrentUser.user?.getName() ?: ""
             } else user.getName()
             Column {
@@ -586,7 +626,7 @@ fun TextFieldChat(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        painter = painterResource(id = R.drawable.round_reply_24),
+                        painter = painterResource(id = if (isEdit) R.drawable.round_edit_24 else R.drawable.round_reply_24),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary
                     )
@@ -604,7 +644,7 @@ fun TextFieldChat(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            text = replyMessage?.message ?: "",
+                            text = selectedMessage?.message ?: "",
                             maxLines = 1,
                             modifier = Modifier.fillMaxWidth(),
                             overflow = TextOverflow.Ellipsis
@@ -659,6 +699,7 @@ fun TextFieldChat(
                 AnimatedContent(targetState = when {
                     room == null -> 1
                     text.isEmpty() -> 2
+                    isEdit -> 4
                     else -> 3
                 }, label = "", transitionSpec = {
                     fadeIn() with fadeOut()
@@ -709,6 +750,19 @@ fun TextFieldChat(
                                         )
                                     }
                                 }
+                            }
+                        }
+
+                        4 -> {
+                            FilledIconButton(onClick = {
+                                onEdit.invoke(text)
+                                text = ""
+                                onKeyboardRequest.invoke(false, false)
+                            }) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.baseline_done_24),
+                                    contentDescription = "send"
+                                )
                             }
                         }
 
@@ -782,7 +836,7 @@ fun AppBarChat(
             Column(modifier = Modifier.padding(start = 8.dp)) {
                 Text(
                     text = user.getName(),
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp)
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp)
                 )
                 Text(
                     text = status?.getText(context) ?: stringResource(id = R.string.connecting),

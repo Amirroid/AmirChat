@@ -63,7 +63,7 @@ class LocalData @Inject constructor(
         val key = stringPreferencesKey(roomID)
         return Gson().fromJson(dataStore.data.map {
             it[key]
-        }.firstOrNull(), Array<MessageModel>::class.java).toList()
+        }.firstOrNull() ?: "[]", Array<MessageModel>::class.java).toList()
     }
 
     suspend fun deleteRoom(room: ChatRoom) {

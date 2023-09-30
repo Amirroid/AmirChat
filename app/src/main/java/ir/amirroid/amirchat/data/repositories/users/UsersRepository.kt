@@ -17,8 +17,8 @@ class UsersRepository @Inject constructor(
         users.get().addOnCompleteListener {
             it.result.toObjects(UserModel::class.java).apply {
                 val newData = filter { user ->
-                    user.token != CurrentUser.token && (user.userId.contains(id) || user.getName()
-                        .contains(id))
+                    user.token != CurrentUser.token && (user.userId.contains(id, true) || user.getName()
+                        .contains(id, true))
                 }
                 newData.apply(onComplete)
             }

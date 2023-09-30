@@ -171,7 +171,7 @@ fun ColumnScope.ChatUi() {
     ) {
         ChatSmallToolbar {}
         MessagesList(
-            messages = emptyList(),
+            message = emptyList(),
             showPattern = true,
             replyEnabled = false,
             to = UserModel(),

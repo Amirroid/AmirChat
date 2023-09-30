@@ -11,7 +11,7 @@ object Constants {
     // back end
     const val BASE_UIL_FIREBASE_STORAGE = "https://firebasestorage.googleapis.com"
     const val API_KEY = "7c6c54d003bd422058d2c93dbd7140e2454c495f6f6a2699f24b927c12b0f1e3"
-    const val API_KEY_CLOUD_MESSAGING = "AAAAALu-Vrs:APA91bFF5k6L3OvmDhOJc2jWtRIzr_K8iI_ll-L3MRq-3JF_0i1N0XZCVPG7ifG3P0CXHSB6PTrsTlnoWo6jC1W98IgtGPG2jeTIRj4D1ALZo_BYrvvZLrWtTf-QJqlEu35jpzcGagBJ"
+    const val API_KEY_CLOUD_MESSAGING = "AAAAALu-Vrs:APA91bFF5k6L3OvmDhOJc2jWtRIzr_K8iI_ll-L3MRq-3JF_0i1N0XZCVPG7ifG3P0CXHSB6PTrsTlnoWo6jC1W98IgtGPG2jeTIRj4D1ALZo_BYrvvZLrWtTf-QJqlEu35jpzcGagBJ "
 
     // types
     const val SENDING = 0
@@ -37,6 +37,7 @@ object Constants {
     const val CHAT = "chat"
     const val PROFILE = "profile"
     const val QR_CODE = "qrcode"
+    const val FORWARD = "forward"
 
     // preferences
     const val CATCH_NAME = "catch"

@@ -2,6 +2,7 @@ package ir.amirroid.amirchat.data.events
 
 import androidx.compose.ui.geometry.Offset
 import ir.amirroid.amirchat.data.models.chat.MessageModel
+import ir.amirroid.amirchat.data.models.register.UserModel
 
 sealed class MessageEvents {
     class SeekExo(val position: Long) : MessageEvents()
@@ -17,4 +18,6 @@ sealed class MessageEvents {
     class Seen(val id:String) : MessageEvents()
 
     class OpenId(val id:String) : MessageEvents()
+
+    class OpenUser(val user:UserModel) : MessageEvents()
 }

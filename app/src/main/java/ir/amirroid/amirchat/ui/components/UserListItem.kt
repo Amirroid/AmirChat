@@ -58,6 +58,7 @@ import coil.request.ImageRequest
 import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.models.chat.ChatRoom
 import ir.amirroid.amirchat.data.models.register.CurrentUser
+import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.utils.Profile
 import ir.amirroid.amirchat.utils.formatDateTime
 import ir.amirroid.amirchat.utils.getName
@@ -82,9 +83,6 @@ fun UserListItem(
     onLongClick: () -> Unit,
     onImageLongClick: () -> Unit,
 ) {
-    val user = if (room.from.token == CurrentUser.token) {
-        room.to
-    } else room.from
     val dismissState = rememberDismissState(positionalThreshold = {
         it * .5f
     }, confirmValueChange = {
@@ -146,74 +144,108 @@ fun UserListItem(
             label = "",
             animationSpec = tween(500, easing = EaseInOut)
         )
-        ListItem(headlineContent = {
-            Text(
-                text = user.getName(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }, leadingContent = {
-            Box(contentAlignment = Alignment.BottomEnd) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context).data(user.profilePictureUrl)
-                        .allowHardware(true)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .networkCachePolicy(CachePolicy.ENABLED)
-                        .placeholder(R.drawable.user_default)
-                        .error(R.drawable.user_default)
-                        .diskCachePolicy(CachePolicy.ENABLED).crossfade(true)
-                        .crossfade(300).build(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(50.dp)
-                        .clip(CircleShape)
-                        .pointerInput(Unit) {
-                            detectTapGestures(onLongPress = {
-                                onImageLongClick.invoke()
-                            })
-                        },
-                    contentScale = ContentScale.Crop
-                )
-                SelectionBox(checked = selected)
-            }
-        },
-            supportingContent = if (room.lastMessage.isNotEmpty()) {
-                {
-                    Text(
-                        text = room.lastMessage,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            } else null, modifier = Modifier
-                .fillMaxWidth()
+        Box(
+            modifier = Modifier
                 .clip(RoundedCornerShape(bottomEnd = radius, topEnd = radius))
-                .combinedClickable(
-                    onLongClick = onLongClick,
-                    onClick = if (selectionMode) onLongClick else onClick,
-                ),
-            trailingContent = {
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = room.lastTime.formatDateTime(),
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.alpha(0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    AnimatedContent(targetState = numbers, label = "", transitionSpec = {
-                        scaleIn() with scaleOut()
-                    }) {
-                        if (it != 0) {
-                            Badge(modifier = Modifier.padding(top = 4.dp)) {
-                                Text(
-                                    text = it.toString()
-                                )
-                            }
+        ) {
+            UserListItem(
+                context,
+                onImageLongClick,
+                selectionMode,
+                selected,
+                room,
+                numbers,
+                onLongClick,
+                onClick
+            )
+        }
+
+    }, directions = setOf(DismissDirection.EndToStart), modifier = modifier)
+}
+
+@OptIn(
+    ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class
+)
+@Composable
+fun UserListItem(
+    context: Context,
+    onImageLongClick: () -> Unit,
+    selectionMode: Boolean,
+    selected: Boolean,
+    room: ChatRoom,
+    numbers: Int,
+    onLongClick: () -> Unit,
+    onClick: () -> Unit
+) {
+    val user = if (room.from.token == CurrentUser.token) {
+        room.to
+    } else room.from
+    ListItem(headlineContent = {
+        Text(
+            text = user.getName(),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }, leadingContent = {
+        Box(contentAlignment = Alignment.BottomEnd) {
+            AsyncImage(
+                model = ImageRequest.Builder(context).data(user.profilePictureUrl)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .placeholder(R.drawable.user_default)
+                    .error(R.drawable.user_default)
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .crossfade(true)
+                    .crossfade(300).build(),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+                    .pointerInput(Unit) {
+                        detectTapGestures(onLongPress = {
+                            onImageLongClick.invoke()
+                        })
+                    },
+                contentScale = ContentScale.Crop
+            )
+            SelectionBox(checked = selected)
+        }
+    },
+        supportingContent = if (room.lastMessage.isNotEmpty()) {
+            {
+                Text(
+                    text = room.lastMessage,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        } else null, modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onLongClick = onLongClick,
+                onClick = if (selectionMode) onLongClick else onClick,
+            ),
+        trailingContent = {
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = room.lastTime.formatDateTime(),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.alpha(0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                AnimatedContent(targetState = numbers, label = "", transitionSpec = {
+                    scaleIn() with scaleOut()
+                }) {
+                    if (it != 0) {
+                        Badge(modifier = Modifier.padding(top = 4.dp)) {
+                            Text(
+                                text = it.toString()
+                            )
                         }
                     }
                 }
             }
-        )
-    }, directions = setOf(DismissDirection.EndToStart), modifier = modifier)
+        }
+    )
 }

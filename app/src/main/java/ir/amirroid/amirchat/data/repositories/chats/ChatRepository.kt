@@ -4,11 +4,14 @@ import android.content.Context
 import android.util.Log
 import androidx.core.net.toUri
 import androidx.media3.common.FileTypes
+import androidx.media3.common.util.HandlerWrapper.Message
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.RemoteMessage
 import com.google.firebase.storage.StorageReference
 import com.google.gson.Gson
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -24,6 +27,7 @@ import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.utils.Constants
 import ir.amirroid.amirchat.utils.divIfNotZero
+import ir.amirroid.amirchat.utils.getName
 import ir.amirroid.amirchat.utils.getText
 import ir.amirroid.amirchat.utils.getType
 import ir.amirroid.amirchat.utils.id
@@ -41,10 +45,15 @@ import kotlinx.coroutines.launch
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.FormBody
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
+import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import javax.inject.Inject
@@ -215,14 +224,16 @@ class ChatRepository @Inject constructor(
                 message.id
             ).setValue(message.copy(files = it)).addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    sendFcmMessage(fcmToken)
+                    sendFcmMessage(fcmToken, message)
                     chats.orderByChild("chatRoom").equalTo(message.chatRoom).get()
                         .addOnSuccessListener { chatTask ->
-                            val children = chatTask.children.map { model -> model.getValue(MessageModel::class.java) }
-                            val fromCount = children.count { model->
+                            val children =
+                                chatTask.children.map { model -> model.getValue(MessageModel::class.java) }
+                            Log.d("fdfds", "addMessage: ${children.size}")
+                            val fromCount = children.count { model ->
                                 model?.from == message.chatRoom.split("-").firstOrNull()
                             }
-                            val toCount = children.count() - fromCount
+                            val toCount = children.size - fromCount
                             rooms.child(message.chatRoom).updateChildren(
                                 mapOf(
                                     "lastMessage" to message.getText(context),
@@ -240,28 +251,57 @@ class ChatRepository @Inject constructor(
         }
     }
 
-    private fun sendFcmMessage(fcmToken: String) {
-        val body = FormBody.Builder()
-            .add("to", fcmToken)
-            .build()
-        val request = Request.Builder()
-            .url("https://fcm.googleapis.com/v1/projects/amir-chat-394722/messages:send")
-            .post(
-                body
-            )
-            .addHeader("Content-Type", "application/json")
-            .addHeader("Authorization", "key=" + Constants.API_KEY_CLOUD_MESSAGING)
-            .build()
-        okHttpClient.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e("fdfdd", "onFailure: ${e.message}")
+    private fun sendFcmMessage(fcmToken: String, message: MessageModel) {
+        scope.launch {
+            val roomsJson = localData.rooms.firstOrNull() ?: "[]"
+            val rooms = Gson().fromJson(roomsJson, Array<ChatRoom>::class.java).toList()
+            val room = rooms.find { it.id == message.chatRoom }
+            val isNotification = if (room?.from?.token == CurrentUser.token) {
+                room?.toNotificationEnabled
+            } else {
+                room?.fromNotificationEnabled
             }
-
-            override fun onResponse(call: Call, response: Response) {
-                Log.d("fdfdd", "onFailure: ${response.body?.string()}")
+            if (isNotification == false) {
+                Log.d("dsfsfd", "sendFcmMessage: $isNotification")
+                return@launch
             }
+            val user = if (room?.from?.token == message.from) {
+                room.from
+            } else {
+                room?.to
+            }
+            val userJson = Gson().toJson(user)
+            val json = """
+        {
+            "to": "$fcmToken",
+            "notification": {
+                "title": "${user?.getName()}",
+                "body": "${message.message}"
+            }
+            "data" : $userJson
+        }
+    """.trimIndent()
 
-        })
+            val mediaType = "application/json".toMediaTypeOrNull()
+            val requestBody = RequestBody.create(mediaType, json)
+
+            val request = Request.Builder()
+                .url("https://fcm.googleapis.com/fcm/send")
+                .post(requestBody)
+                .addHeader("Authorization", "key=${Constants.API_KEY_CLOUD_MESSAGING}")
+                .build()
+            okHttpClient.newCall(
+                request
+            ).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    Log.e("dsfsfd", "sendFcmMessage: ${e.message}")
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    Log.d("dsfsfd", "sendFcmMessage: ${response.body?.string()}")
+                }
+            })
+        }
     }
 
     fun getAllSending(room: String) = sendingMessagesDao.getAll(room)
@@ -401,24 +441,30 @@ class ChatRepository @Inject constructor(
         val numbers = HashMap<String, Int>()
         scope.launch {
             rooms.forEach { room ->
-                launch {
-                    localData.collectToChatsFromRoom(room.id) {
-                        val number = if (room.from.token == CurrentUser.token){
-                            room.toNumberOfMessages
-                        }else{
-                            room.fromNumberOfMessages
-                        }
-                        numbers[room.id] = (number - it.toMutableList().apply {
-                            removeIf { model ->
-                                model.status != Constants.SEEN || model.from == CurrentUser.token
-                            }
-                        }.count())
-                        Log.d(
-                            "fdgdgfd",
-                            "observeToNumberOfMessages: ${numbers[room.id]}  ${room.fromNumberOfMessages}  ${room.toNumberOfMessages}"
-                        )
-                        onData.invoke(numbers)
+                localData.collectToChatsFromRoom(room.id) {
+                    val number = if (room.from.token == CurrentUser.token) {
+                        Log.d("dsfjdoif", "to ${room.toNumberOfMessages}")
+                        room.toNumberOfMessages
+                    } else {
+                        Log.d("dsfjdoif", "from ${room.fromNumberOfMessages}")
+                        room.fromNumberOfMessages
                     }
+                    numbers[room.id] = (number - it.toMutableList().apply {
+                        removeIf { model ->
+                            model.status != Constants.SEEN || model.from == CurrentUser.token
+                        }
+                    }.count()).coerceAtLeast(0)
+                    Log.d(
+                        "dsfjdoif",
+                        "observeToNumberOfMessages: ${room.lastMessage} $number ${numbers[room.id]} ${
+                            it.toMutableList().apply {
+                                removeIf { model ->
+                                    model.status != Constants.SEEN || model.from == CurrentUser.token
+                                }
+                            }.count()
+                        }"
+                    )
+                    onData.invoke(numbers)
                 }
             }
         }
@@ -433,6 +479,50 @@ class ChatRepository @Inject constructor(
             rooms.child(room.id).child("fromNotificationEnabled").setValue(enabled)
         } else {
             rooms.child(room.id).child("toNotificationEnabled").setValue(enabled)
+        }
+    }
+
+    fun editMessage(text: String, id: String) {
+        chats.child(id).child("message").setValue(text)
+    }
+
+    fun addMessageWithOutFiles(
+        message: MessageModel,
+        fcmToken: String,
+        onResponse: () -> Unit
+    ) {
+        scope.launch {
+            sendingMessagesDao.add(message.copy(status = Constants.SENDING))
+        }
+        chats.child(
+            message.id
+        ).setValue(message).addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                sendFcmMessage(fcmToken, message)
+                chats.orderByChild("chatRoom").equalTo(message.chatRoom).get()
+                    .addOnSuccessListener { chatTask ->
+                        val children =
+                            chatTask.children.map { model -> model.getValue(MessageModel::class.java) }
+                        Log.d("fdfds", "addMessage: ${children.size}")
+                        val fromCount = children.count { model ->
+                            model?.from == message.chatRoom.split("-").firstOrNull()
+                        }
+                        val toCount = children.size - fromCount
+                        rooms.child(message.chatRoom).updateChildren(
+                            mapOf(
+                                "lastMessage" to message.getText(context),
+                                "lastTime" to System.currentTimeMillis(),
+                                "fromNumberOfMessages" to fromCount,
+                                "toNumberOfMessages" to toCount
+                            )
+                        ).addOnSuccessListener {
+                            onResponse.invoke()
+                        }
+                    }
+            }
+            scope.launch {
+                sendingMessagesDao.delete(message)
+            }
         }
     }
 }
