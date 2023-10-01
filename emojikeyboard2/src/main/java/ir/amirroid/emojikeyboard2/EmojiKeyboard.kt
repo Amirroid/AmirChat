@@ -58,6 +58,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RichTooltipBox
+import androidx.compose.material3.RichTooltipState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberRichTooltipState
 import androidx.compose.material3.surfaceColorAtElevation
@@ -241,7 +242,7 @@ fun EmojiKeyboard(
                             items(emojiData.size, key = { emojiData[it].unicodeName }) {
                                 val emoji = emojiData[it]
                                 if (emoji.variants.isNullOrEmpty()) {
-                                    val tooltipState = rememberRichTooltipState(isPersistent = true)
+                                    val tooltipState = rememberRichTooltipState(isPersistent = false)
                                     RichTooltipBox(
                                         text = { Text(emoji.unicodeName) },
                                         tooltipState = tooltipState

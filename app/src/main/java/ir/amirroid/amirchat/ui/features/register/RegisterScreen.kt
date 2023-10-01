@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.pager.HorizontalPager
@@ -149,274 +151,275 @@ fun RegisterScreen(
             }
         }
     }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .navigationBarsPadding(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        CenterAlignedTopAppBar(title = {
-            Text(text = stringResource(id = R.string.app_name), fontWeight = FontWeight.Bold)
-        }, navigationIcon = {
-            AnimatedVisibility(
-                visible = pagerState.currentPage == 1,
-                enter = scaleIn(initialScale = 0.6f) + fadeIn(),
-                exit = scaleOut(targetScale = 0.6f) + fadeOut()
-            ) {
-                IconButton(onClick = {
-                    scope.launch {
-                        pagerState.animateScrollToPage(0)
-                    }
-                }) {
-                    Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = "back")
-                }
-            }
-        })
-        HorizontalPager(
-            state = pagerState, userScrollEnabled = false, modifier = Modifier.weight(1f),
+    Surface(modifier = Modifier.systemBarsPadding()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            when (it) {
-                0 -> {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp)
-                            .fillMaxSize()
-                    ) {
-                        Spacer(modifier = Modifier.weight(1f))
-                        Text(
-                            text = stringResource(id = R.string.your_phone_number),
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
-                        )
-                        Text(
-                            text = stringResource(id = R.string.confirm_phone_number),
-                            style = MaterialTheme.typography.labelMedium.copy(textAlign = TextAlign.Center),
+            CenterAlignedTopAppBar(title = {
+                Text(text = stringResource(id = R.string.app_name), fontWeight = FontWeight.Bold)
+            }, navigationIcon = {
+                AnimatedVisibility(
+                    visible = pagerState.currentPage == 1,
+                    enter = scaleIn(initialScale = 0.6f) + fadeIn(),
+                    exit = scaleOut(targetScale = 0.6f) + fadeOut()
+                ) {
+                    IconButton(onClick = {
+                        scope.launch {
+                            pagerState.animateScrollToPage(0)
+                        }
+                    }) {
+                        Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = "back")
+                    }
+                }
+            })
+            HorizontalPager(
+                state = pagerState, userScrollEnabled = false, modifier = Modifier.weight(1f),
+            ) {
+                when (it) {
+                    0 -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
-                                .padding(top = 8.dp)
-                                .fillMaxWidth(0.7f)
-                                .alpha(0.7f)
-                        )
-                        Column(modifier = Modifier.padding(top = 24.dp)) {
-                            AnimatedTextField(
-                                text = phoneNumber,
-                                error = phoneNumber.checkMobile().not() && phoneNumber.length == 11
+                                .padding(horizontal = 12.dp)
+                                .fillMaxSize()
+                        ) {
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text(
+                                text = stringResource(id = R.string.your_phone_number),
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            CheckboxText(
-                                checked = syncContacts,
-                                onCheckedChange = { check ->
-                                    syncContacts = check
-                                    scope.launch {
-                                        if (snackBarVisible) {
-                                            snackBarVisible = false
-                                            delay(300)
+                            Text(
+                                text = stringResource(id = R.string.confirm_phone_number),
+                                style = MaterialTheme.typography.labelMedium.copy(textAlign = TextAlign.Center),
+                                modifier = Modifier
+                                    .padding(top = 8.dp)
+                                    .fillMaxWidth(0.7f)
+                                    .alpha(0.7f)
+                            )
+                            Column(modifier = Modifier.padding(top = 24.dp)) {
+                                AnimatedTextField(
+                                    text = phoneNumber,
+                                    error = phoneNumber.checkMobile().not() && phoneNumber.length == 11
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                CheckboxText(
+                                    checked = syncContacts,
+                                    onCheckedChange = { check ->
+                                        syncContacts = check
+                                        scope.launch {
+                                            if (snackBarVisible) {
+                                                snackBarVisible = false
+                                                delay(300)
+                                            }
+                                            snackBarMessage =
+                                                context.getString(if (check) R.string.contacts_message else R.string.contacts_message_not)
+                                            snackBarVisible = true
                                         }
-                                        snackBarMessage =
-                                            context.getString(if (check) R.string.contacts_message else R.string.contacts_message_not)
-                                        snackBarVisible = true
+                                    },
+                                    text = stringResource(
+                                        id = R.string.sync_contacts,
+                                    ),
+                                )
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
+                            FloatingActionButton(
+                                onClick = {
+                                    if (phoneNumber.checkMobile()) {
+                                        viewModel.sendCode {
+                                            scope.launch { pagerState.animateScrollToPage(1) }
+                                        }
+                                    } else {
+                                        scope.launch {
+                                            if (snackBarVisible) {
+                                                snackBarVisible = false
+                                                delay(300)
+                                            }
+                                            snackBarMessage =
+                                                context.getString(R.string.mobile_number_not_valid)
+                                            snackBarVisible = true
+                                        }
                                     }
                                 },
-                                text = stringResource(
-                                    id = R.string.sync_contacts,
+                                modifier = Modifier
+                                    .align(Alignment.End),
+                                shape = CircleShape,
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
+                            ) {
+                                if (loading) {
+                                    CircularProgressIndicator(
+                                        strokeCap = StrokeCap.Round,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Rounded.ArrowForward,
+                                        contentDescription = "next"
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                    }
+
+                    1 -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp)
+                                .fillMaxSize()
+                        ) {
+                            Text(
+                                text = stringResource(id = R.string.check_your_messages),
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
+                            )
+                            Text(
+                                text = stringResource(id = R.string.verify_messages_description).replace(
+                                    "(number)",
+                                    phoneNumber
                                 ),
+                                style = MaterialTheme.typography.labelMedium.copy(textAlign = TextAlign.Center),
+                                modifier = Modifier
+                                    .padding(top = 8.dp)
+                                    .fillMaxWidth(0.7f)
+                                    .alpha(0.7f)
+                            )
+                            OtpView(
+                                code = verifyCode,
+                                length = 6,
+                                modifier = Modifier.padding(top = 24.dp),
+                                correct = verifyCode == currentCode && verifyCode.length == 6
                             )
                         }
-                        Spacer(modifier = Modifier.weight(1f))
-                        FloatingActionButton(
-                            onClick = {
-                                if (phoneNumber.checkMobile()) {
-                                    viewModel.sendCode {
-                                        scope.launch { pagerState.animateScrollToPage(1) }
-                                    }
-                                } else {
-                                    scope.launch {
-                                        if (snackBarVisible) {
-                                            snackBarVisible = false
-                                            delay(300)
-                                        }
-                                        snackBarMessage =
-                                            context.getString(R.string.mobile_number_not_valid)
-                                        snackBarVisible = true
-                                    }
+                    }
+
+                    2 -> {
+                        val imageProfile = viewModel.imageProfile
+                        val firstName = viewModel.firstName
+                        val lastName = viewModel.lastName
+                        val id by viewModel.id.collectAsStateWithLifecycle()
+                        val bio = viewModel.bio
+                        val imagePicker =
+                            rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { image ->
+                                if (image != null) {
+                                    viewModel.imageProfile = image
                                 }
-                            },
+                            }
+                        val idExist = viewModel.idExist
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
-                                .align(Alignment.End),
-                            shape = CircleShape,
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
+                                .fillMaxSize()
+                                .padding(top = 24.dp)
+                                .padding(horizontal = 12.dp)
+                                .verticalScroll(rememberScrollState())
                         ) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context).data(imageProfile).crossfade(true)
+                                    .placeholder(R.drawable.round_image_24)
+                                    .error(R.drawable.round_image_24)
+                                    .crossfade(500)
+                                    .build(),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .clip(
+                                        CircleShape
+                                    )
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                    .size(108.dp)
+                                    .clickable {
+                                        imagePicker.launch("image/*")
+                                    }
+                                    .padding(if (imageProfile == Uri.EMPTY) 30.dp else 0.dp),
+                                colorFilter = if (imageProfile == Uri.EMPTY) ColorFilter.tint(
+                                    MaterialTheme.colorScheme.onBackground
+                                ) else null,
+                                contentScale = ContentScale.Crop,
+                                filterQuality = FilterQuality.High
+                            )
+                            OutlinedTextField(
+                                value = firstName,
+                                onValueChange = { value -> viewModel.firstName = value },
+                                modifier = Modifier
+                                    .padding(top = 12.dp)
+                                    .fillMaxWidth(),
+                                label = {
+                                    Text(text = stringResource(id = R.string.first_name))
+                                },
+                                shape = MaterialTheme.shapes.medium
+                            )
+                            OutlinedTextField(
+                                value = lastName,
+                                onValueChange = { value -> viewModel.lastName = value },
+                                modifier = Modifier
+                                    .padding(top = 12.dp)
+                                    .fillMaxWidth(),
+                                label = {
+                                    Text(text = stringResource(id = R.string.last_name))
+                                },
+                                shape = MaterialTheme.shapes.medium
+                            )
+                            OutlinedTextField(
+                                value = id,
+                                onValueChange = { value -> viewModel.id.value = value },
+                                modifier = Modifier
+                                    .padding(top = 12.dp)
+                                    .fillMaxWidth(),
+                                label = {
+                                    Text(text = stringResource(id = R.string.id))
+                                },
+                                shape = MaterialTheme.shapes.medium,
+                                isError = idExist
+                            )
+                            OutlinedTextField(
+                                value = bio,
+                                onValueChange = { value -> viewModel.bio = value },
+                                modifier = Modifier
+                                    .padding(top = 12.dp)
+                                    .fillMaxWidth(),
+                                label = {
+                                    Text(text = stringResource(id = R.string.bio))
+                                },
+                                shape = MaterialTheme.shapes.medium,
+                                minLines = 3
+                            )
+                            Button(
+                                onClick = {
+                                    viewModel.logIn {
+                                        navigation.navigate(ChatPages.HomeScreen.route)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .padding(top = 12.dp)
+                                    .height(OutlinedTextFieldDefaults.MinHeight)
+                                    .fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Text(text = stringResource(id = R.string.register))
+                            }
+                            Spacer(modifier = Modifier.height(24.dp))
                             if (loading) {
-                                CircularProgressIndicator(
-                                    strokeCap = StrokeCap.Round,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Rounded.ArrowForward,
-                                    contentDescription = "next"
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-                }
-
-                1 -> {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp)
-                            .fillMaxSize()
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.check_your_messages),
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
-                        )
-                        Text(
-                            text = stringResource(id = R.string.verify_messages_description).replace(
-                                "(number)",
-                                phoneNumber
-                            ),
-                            style = MaterialTheme.typography.labelMedium.copy(textAlign = TextAlign.Center),
-                            modifier = Modifier
-                                .padding(top = 8.dp)
-                                .fillMaxWidth(0.7f)
-                                .alpha(0.7f)
-                        )
-                        OtpView(
-                            code = verifyCode,
-                            length = 6,
-                            modifier = Modifier.padding(top = 24.dp),
-                            correct = verifyCode == currentCode && verifyCode.length == 6
-                        )
-                    }
-                }
-
-                2 -> {
-                    val imageProfile = viewModel.imageProfile
-                    val firstName = viewModel.firstName
-                    val lastName = viewModel.lastName
-                    val id by viewModel.id.collectAsStateWithLifecycle()
-                    val bio = viewModel.bio
-                    val imagePicker =
-                        rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { image ->
-                            if (image != null) {
-                                viewModel.imageProfile = image
-                            }
-                        }
-                    val idExist = viewModel.idExist
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 24.dp)
-                            .padding(horizontal = 12.dp)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context).data(imageProfile).crossfade(true)
-                                .placeholder(R.drawable.round_image_24)
-                                .error(R.drawable.round_image_24)
-                                .crossfade(500)
-                                .build(),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .clip(
-                                    CircleShape
-                                )
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                .size(108.dp)
-                                .clickable {
-                                    imagePicker.launch("image/*")
-                                }
-                                .padding(if (imageProfile == Uri.EMPTY) 30.dp else 0.dp),
-                            colorFilter = if (imageProfile == Uri.EMPTY) ColorFilter.tint(
-                                MaterialTheme.colorScheme.onBackground
-                            ) else null,
-                            contentScale = ContentScale.Crop,
-                            filterQuality = FilterQuality.High
-                        )
-                        OutlinedTextField(
-                            value = firstName,
-                            onValueChange = { value -> viewModel.firstName = value },
-                            modifier = Modifier
-                                .padding(top = 12.dp)
-                                .fillMaxWidth(),
-                            label = {
-                                Text(text = stringResource(id = R.string.first_name))
-                            },
-                            shape = MaterialTheme.shapes.medium
-                        )
-                        OutlinedTextField(
-                            value = lastName,
-                            onValueChange = { value -> viewModel.lastName = value },
-                            modifier = Modifier
-                                .padding(top = 12.dp)
-                                .fillMaxWidth(),
-                            label = {
-                                Text(text = stringResource(id = R.string.last_name))
-                            },
-                            shape = MaterialTheme.shapes.medium
-                        )
-                        OutlinedTextField(
-                            value = id,
-                            onValueChange = { value -> viewModel.id.value = value },
-                            modifier = Modifier
-                                .padding(top = 12.dp)
-                                .fillMaxWidth(),
-                            label = {
-                                Text(text = stringResource(id = R.string.id))
-                            },
-                            shape = MaterialTheme.shapes.medium,
-                            isError = idExist
-                        )
-                        OutlinedTextField(
-                            value = bio,
-                            onValueChange = { value -> viewModel.bio = value },
-                            modifier = Modifier
-                                .padding(top = 12.dp)
-                                .fillMaxWidth(),
-                            label = {
-                                Text(text = stringResource(id = R.string.bio))
-                            },
-                            shape = MaterialTheme.shapes.medium,
-                            minLines = 3
-                        )
-                        Button(
-                            onClick = {
-                                viewModel.logIn {
-                                    navigation.navigate(ChatPages.HomeScreen.route)
-                                }
-                            },
-                            modifier = Modifier
-                                .padding(top = 12.dp)
-                                .height(OutlinedTextFieldDefaults.MinHeight)
-                                .fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium
-                        ) {
-                            Text(text = stringResource(id = R.string.register))
-                        }
-                        Spacer(modifier = Modifier.height(24.dp))
-                        if (loading) {
-                            Dialog(onDismissRequest = {}) {
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .wrapContentHeight(),
-                                    shape = MaterialTheme.shapes.medium,
-                                ) {
-                                    Row(
+                                Dialog(onDismissRequest = {}) {
+                                    Surface(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 24.dp)
-                                            .padding(start = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                            .wrapContentHeight(),
+                                        shape = MaterialTheme.shapes.medium,
                                     ) {
-                                        CircularProgressIndicator(strokeCap = StrokeCap.Round)
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(text = stringResource(id = R.string.loading))
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 24.dp)
+                                                .padding(start = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            CircularProgressIndicator(strokeCap = StrokeCap.Round)
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Text(text = stringResource(id = R.string.loading))
+                                        }
                                     }
                                 }
                             }
@@ -424,42 +427,42 @@ fun RegisterScreen(
                     }
                 }
             }
-        }
-        SnackBar(text = snackBarMessage, visible = snackBarVisible, onVisibleChanged = {
-            snackBarVisible = false
-        })
-        AnimatedVisibility(
-            visible = pagerState.currentPage != 2,
-            enter = slideInVertically { 300 } + fadeIn(),
-            exit = slideOutVertically { 300 } + fadeOut(),
-        ) {
-            NumberKeyboard(modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 12.dp),
-                onNumberClicked = {
-                    if (pagerState.currentPage == 0) {
-                        if (phoneNumber.length <= 10) {
-                            viewModel.phoneNumber += it
+            SnackBar(text = snackBarMessage, visible = snackBarVisible, onVisibleChanged = {
+                snackBarVisible = false
+            })
+            AnimatedVisibility(
+                visible = pagerState.currentPage != 2,
+                enter = slideInVertically { 300 } + fadeIn(),
+                exit = slideOutVertically { 300 } + fadeOut(),
+            ) {
+                NumberKeyboard(modifier = Modifier
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 12.dp),
+                    onNumberClicked = {
+                        if (pagerState.currentPage == 0) {
+                            if (phoneNumber.length <= 10) {
+                                viewModel.phoneNumber += it
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                        } else {
+                            if (verifyCode.length != 6) {
+                                viewModel.verifyCode += it
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                        }
+                    }) {
+                    try {
+                        if (pagerState.currentPage == 0) {
+                            viewModel.phoneNumber =
+                                phoneNumber.substring(0, phoneNumber.length.minus(1))
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        } else {
+                            viewModel.verifyCode =
+                                verifyCode.substring(0, verifyCode.length.minus(1))
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         }
-                    } else {
-                        if (verifyCode.length != 6) {
-                            viewModel.verifyCode += it
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        }
+                    } catch (e: Exception) {
                     }
-                }) {
-                try {
-                    if (pagerState.currentPage == 0) {
-                        viewModel.phoneNumber =
-                            phoneNumber.substring(0, phoneNumber.length.minus(1))
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                    } else {
-                        viewModel.verifyCode =
-                            verifyCode.substring(0, verifyCode.length.minus(1))
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                    }
-                } catch (e: Exception) {
                 }
             }
         }

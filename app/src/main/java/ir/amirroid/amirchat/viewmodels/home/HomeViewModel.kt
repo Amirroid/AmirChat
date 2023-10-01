@@ -58,12 +58,23 @@ class HomeViewModel @Inject constructor(
         super.onCleared()
     }
 
-    fun toggleRoom(room: ChatRoom){
-        if (selectedRooms.contains(room)){
+    fun toggleRoom(room: ChatRoom) {
+        if (selectedRooms.contains(room)) {
             selectedRooms.remove(room)
-        }else{
+        } else {
             selectedRooms.add(room)
         }
-        Log.d("sdfsf", "toggleRoom: ${selectedRooms}")
+    }
+
+    fun deleteChats(id: String) {
+        chatRepository.deleteChats(id)
+    }
+
+    fun markAsRead(id: String) {
+        chatRepository.markAsRead(id)
+    }
+
+    fun setNotificationEnabled(enabled: Boolean, room: ChatRoom) {
+        chatRepository.setMyNotificationEnabled(enabled, room)
     }
 }

@@ -380,11 +380,12 @@ class ChatRepository @Inject constructor(
                             }
                         }
                     }
-                    snapshot.ref.removeValue().addOnSuccessListener {
-                        scope.launch {
-                            localData.deleteRoom(room)
-                            localData.deleteChats(room.id)
-                        }
+                    snapshot.children.forEach {
+                        it.ref.removeValue()
+                    }
+                    scope.launch {
+                        localData.deleteRoom(room)
+                        localData.deleteChats(room.id)
                     }
                 }
             })
@@ -524,5 +525,49 @@ class ChatRepository @Inject constructor(
                 sendingMessagesDao.delete(message)
             }
         }
+    }
+
+    fun deleteChats(id: String) {
+        chats.orderByChild("chatRoom").equalTo(id)
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    snapshot.children.forEach {
+                        val files = it.getValue(MessageModel::class.java)?.files
+                        files?.forEach { file ->
+                            chatStorage.child(file.reference).delete()
+                        }
+                        it.ref.removeValue()
+                    }
+                    rooms.child(id).updateChildren(
+                        mapOf(
+                            "lastTime" to 0,
+                            "lastMessage" to ""
+                        )
+                    )
+                    scope.launch {
+                        localData.deleteChats(id)
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) = Unit
+
+            })
+    }
+
+    fun markAsRead(id: String) {
+        chats.orderByChild("chatRoom").equalTo(id)
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    snapshot.children.filter {
+                        val message = it.getValue(MessageModel::class.java)
+                        message?.from != CurrentUser.token && message?.status != Constants.SEEN
+                    }.forEach {
+                        it.ref.removeValue()
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) = Unit
+
+            })
     }
 }

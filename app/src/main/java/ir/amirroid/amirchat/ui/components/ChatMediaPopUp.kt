@@ -9,6 +9,7 @@ import android.net.Uri
 import android.util.Log
 import android.view.MotionEvent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -30,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -81,6 +83,7 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
+import coil.Coil
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.decode.VideoFrameDecoder
@@ -112,11 +115,14 @@ fun ChatMediaPopUp(
     val pagerState = rememberPagerState(initialPage = message?.files?.indexOf(file) ?: 1) {
         message?.files?.size ?: 1
     }
+    val lazyListState = rememberLazyListState()
+    val flingBehavior = rememberSnapFlingBehavior(lazyListState = lazyListState)
     LaunchedEffect(key1 = show) {
         pagerState.scrollToPage(message?.files?.indexOf(file) ?: 1)
     }
-    val lazyState = rememberLazyListState()
-    val snapState = rememberSnapFlingBehavior(lazyListState = lazyState)
+    LaunchedEffect(key1 = pagerState.currentPage) {
+        lazyListState.animateScrollToItem(pagerState.currentPage)
+    }
     val scope = rememberCoroutineScope()
     var play by remember {
         mutableStateOf(false)
@@ -136,11 +142,27 @@ fun ChatMediaPopUp(
     LaunchedEffect(key1 = playButtonShow) {
         if (playButtonShow) {
             delay(3000)
-            playButtonShow = false
+            if (pagerState.isScrollInProgress.not()){
+                playButtonShow = false
+            }
+        }
+    }
+    LaunchedEffect(key1 = pagerState.isScrollInProgress ){
+        playButtonShow = if (pagerState.isScrollInProgress){
+            true
+        }else{
+            delay(500)
+            false
         }
     }
     MediaPopUp(show = show, size = size, offset = offset, mediaContent = {
-        MediaContent(message, pagerState, play, it, changeProgress) { cProgress, cDuration, isPlay ->
+        MediaContent(
+            message,
+            pagerState,
+            play,
+            it,
+            changeProgress
+        ) { cProgress, cDuration, isPlay ->
             progress = cProgress
             duration = cDuration
             play = isPlay
@@ -150,8 +172,8 @@ fun ChatMediaPopUp(
         playButtonShow = playButtonShow.not()
     }, overlyContent = {
         val context = LocalContext.current
-        val imageLoader = ImageLoader(context)
-        val videoLoader = ImageLoader.Builder(context)
+        val imageLoader = Coil.imageLoader(context)
+        val videoLoader = Coil.imageLoader(context).newBuilder()
             .components {
                 add(VideoFrameDecoder.Factory())
             }
@@ -196,29 +218,35 @@ fun ChatMediaPopUp(
                     if (message != null) {
                         val files = message.files
                         LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            state = lazyState,
-                            flingBehavior = snapState,
+                            state = lazyListState,
+                            flingBehavior = flingBehavior,
                             horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.wrapContentSize().align(Alignment.CenterHorizontally)
                         ) {
-                            items(files.size, key = { files[it].fromPath }) {
+                            items(files.size) {
                                 val currentFile = files[it]
                                 val isVideo = currentFile.fromPath.startsWith("video")
                                 val isMyFrom = message.from == CurrentUser.token
-                                ImagePreview(
-                                    isVideo,
-                                    isMyFrom,
-                                    if (isVideo) videoLoader else imageLoader,
-                                    context,
-                                    currentFile
+                                Box(
+                                    modifier = Modifier.size(64.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    scope.launch {
-                                        pagerState.animateScrollToPage(it)
+                                    ImagePreview(
+                                        isVideo,
+                                        isMyFrom,
+                                        if (isVideo) videoLoader else imageLoader,
+                                        context,
+                                        currentFile,
+                                        pagerState.currentPage == it
+                                    ) {
+                                        scope.launch {
+                                            pagerState.animateScrollToPage(it)
+                                        }
                                     }
                                 }
-                                if (it != files.size) {
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                }
+//                                if (it != files.size) {
+//                                    Spacer(modifier = Modifier.width(4.dp))
+//                                }
                             }
                         }
                         Text(
@@ -253,6 +281,7 @@ fun ImagePreview(
     imageLoader: ImageLoader,
     context: Context,
     file: FileMessage,
+    selected: Boolean,
     onClick: () -> Unit
 ) {
     var bitmap by remember {
@@ -283,9 +312,10 @@ fun ImagePreview(
         }
 
     }
+    val plusSize by animateDpAsState(targetValue = if (selected) 8.dp else 0.dp, label = "")
     Box(
         modifier = Modifier
-            .size(64.dp)
+            .size(56.dp + plusSize, 56.dp)
             .clip(
                 RoundedCornerShape(4.dp)
             )
@@ -310,7 +340,7 @@ fun MediaContent(
     onEvent: (Long, Long, Boolean) -> Unit
 ) {
     val context = LocalContext.current
-    val imageLoader = ImageLoader(context)
+    val imageLoader = Coil.imageLoader(context)
     if (message != null) {
         val isMyFrom = message.from == CurrentUser.token
         val files = message.files
@@ -355,9 +385,6 @@ fun ImageView(
                 bitmap = BitmapFactory.decodeFile(file.fromPath)
             }
             val request = ImageRequest.Builder(context).data(file.path)
-                .diskCachePolicy(CachePolicy.ENABLED)
-                .allowHardware(true)
-                .memoryCachePolicy(CachePolicy.ENABLED)
                 .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
             imageLoader.enqueue(request)
         }
@@ -390,5 +417,6 @@ fun VideoView(
         onVideoEvent = { d, c, p ->
             onEvent.invoke(c, d, p)
         },
-        play = play)
+        play = play
+    )
 }

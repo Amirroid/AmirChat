@@ -31,8 +31,8 @@ fun SnackBar(text: String, visible: Boolean, onVisibleChanged: (Boolean) -> Unit
     }
     AnimatedVisibility(
         visible = visible,
-        enter = expandVertically(expandFrom = Alignment.Bottom, animationSpec = tween(300)),
-        exit = shrinkVertically(shrinkTowards = Alignment.Bottom, animationSpec = tween(300))
+        enter = expandVertically(expandFrom = Alignment.Top, animationSpec = tween(300)),
+        exit = shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(300))
     ) {
         Surface(
             modifier = Modifier

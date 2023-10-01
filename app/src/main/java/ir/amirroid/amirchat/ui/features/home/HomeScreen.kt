@@ -45,6 +45,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -109,17 +110,17 @@ fun HomeScreen(
     val matrix = context.resources.displayMetrics
     val widthDrawer = matrix.widthPixels * .7f
     val widthDpDrawer = with(density) { widthDrawer.toDp() }
-    var popUpChatRoom by remember {
-        mutableStateOf<ChatRoom?>(null)
-    }
     val hapticFeedback = LocalHapticFeedback.current
-    val showChatPopUp by remember {
-        derivedStateOf { popUpChatRoom != null }
+    var showChatPopUp by remember {
+        mutableStateOf(false)
+    }
+    var selectedChatPopUp by remember {
+        mutableStateOf(ChatRoom())
     }
     val blurChats by animateDpAsState(targetValue = if (showChatPopUp) 10.dp else 0.dp, label = "")
     BackHandler {
         if (showChatPopUp) {
-            popUpChatRoom = null
+            showChatPopUp = false
         } else (context as Activity).finish()
     }
     ModalNavigationDrawer(
@@ -238,18 +239,25 @@ fun HomeScreen(
                             viewModel.toggleRoom(room)
                             hapticFeedback.startLongPress()
                         }) {
-                        popUpChatRoom = room
+                        selectedChatPopUp = room
+                        showChatPopUp = true
                         hapticFeedback.startLongPress()
                     }
                 }
             }
         }
     }
-    ChatPopUp(visible = showChatPopUp) {
+    ChatPopUp(visible = showChatPopUp, room = selectedChatPopUp) {
         when (it) {
-            5 -> viewModel.deleteRoom(popUpChatRoom!!)
+            1 -> viewModel.deleteChats(selectedChatPopUp.id)
+            2 -> viewModel.setNotificationEnabled(
+                selectedChatPopUp.myNotificationEnabled().not(),
+                selectedChatPopUp
+            )
+            3 -> viewModel.markAsRead(selectedChatPopUp.id)
+            4 -> viewModel.deleteRoom(selectedChatPopUp)
         }
-        popUpChatRoom = null
+        showChatPopUp = false
     }
 }
 

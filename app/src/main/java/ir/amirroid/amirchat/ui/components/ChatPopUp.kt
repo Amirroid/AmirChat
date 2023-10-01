@@ -1,6 +1,8 @@
 package ir.amirroid.amirchat.ui.components
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -46,31 +48,27 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import ir.amirroid.amirchat.R
+import ir.amirroid.amirchat.data.models.chat.ChatRoom
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.ui.features.chat.AppBarChat
 import ir.amirroid.amirchat.utils.SimpleList
 import ir.amirroid.amirchat.viewmodels.ChatViewModel
 
 
+@SuppressLint("UnusedCrossfadeTargetStateParameter")
 @Composable
 fun ChatPopUp(
-    visible: Boolean,
-    onDismissRequest: (Int) -> Unit
+    visible: Boolean, room: ChatRoom, onDismissRequest: (Int) -> Unit
 ) {
     AnimatedVisibility(
-        visible = visible,
-        enter = scaleIn(
-            initialScale = 0.9f,
-            animationSpec = spring(
+        visible = visible, enter = scaleIn(
+            initialScale = 0.9f, animationSpec = spring(
                 dampingRatio = 0.6f,
                 stiffness = Spring.StiffnessMediumLow,
             )
-        ) + fadeIn(),
-        exit = scaleOut(
-            targetScale = 0.9f,
-            animationSpec = spring(
-                dampingRatio = 0.6f,
-                stiffness = Spring.StiffnessMediumLow
+        ) + fadeIn(), exit = scaleOut(
+            targetScale = 0.9f, animationSpec = spring(
+                dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow
             )
         ) + fadeOut()
     ) {
@@ -103,46 +101,41 @@ fun ChatPopUp(
                     elevation = CardDefaults.cardElevation(4.dp)
                 ) {
                     Column {
-                        DropdownMenuItem(
-                            text = { Text(text = stringResource(id = R.string.reply)) },
-                            onClick = { },
+                        DropdownMenuItem(text = { Text(text = stringResource(id = R.string.delete_messages)) },
+                            onClick = { onDismissRequest.invoke(1) },
+                            leadingIcon = {
+                                Crossfade(targetState = room.toNotificationEnabled(), label = "") {
+                                    Icon(
+                                        painter = painterResource(
+                                            R.drawable.outline_delete_sweep_24
+                                        ),
+                                        contentDescription = "delete messages"
+                                    )
+                                }
+                            })
+                        DropdownMenuItem(text = { Text(text = stringResource(id = if (room.myNotificationEnabled()) R.string.mute else R.string.unmute)) },
+                            onClick = { onDismissRequest.invoke(2) },
+                            leadingIcon = {
+                                Crossfade(targetState = room.toNotificationEnabled(), label = "") {
+                                    Icon(
+                                        painter = painterResource(
+                                            id =
+                                            if (room.myNotificationEnabled()) R.drawable.outline_notifications_off_24 else R.drawable.baseline_notifications_none_24
+                                        ),
+                                        contentDescription = "notification"
+                                    )
+                                }
+                            })
+                        DropdownMenuItem(text = { Text(text = stringResource(id = R.string.mark_as_read)) },
+                            onClick = { onDismissRequest.invoke(3) },
                             leadingIcon = {
                                 Icon(
-                                    painter = painterResource(id = R.drawable.round_reply_24),
-                                    contentDescription = "reply"
+                                    painter = painterResource(id = R.drawable.baseline_done_all_24),
+                                    contentDescription = "read"
                                 )
                             })
-                        DropdownMenuItem(
-                            text = { Text(text = stringResource(id = R.string.copy)) },
-                            onClick = { },
-                            leadingIcon = {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.baseline_content_copy_24),
-                                    contentDescription = "copy"
-                                )
-                            })
-                        DropdownMenuItem(
-                            text = { Text(text = stringResource(id = R.string.forward)) },
-                            onClick = { },
-                            leadingIcon = {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.round_reply_24),
-                                    contentDescription = "forward",
-                                    modifier = Modifier.rotate(180f)
-                                )
-                            })
-                        DropdownMenuItem(
-                            text = { Text(text = stringResource(id = R.string.save)) },
-                            onClick = { },
-                            leadingIcon = {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.round_bookmark_border_24),
-                                    contentDescription = "save"
-                                )
-                            })
-                        DropdownMenuItem(
-                            text = { Text(text = stringResource(id = R.string.delete)) },
-                            onClick = { onDismissRequest.invoke(5) },
+                        DropdownMenuItem(text = { Text(text = stringResource(id = R.string.delete)) },
+                            onClick = { onDismissRequest.invoke(4) },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Outlined.Delete,
@@ -184,14 +177,12 @@ fun ColumnScope.ChatUi() {
 
 @Composable
 fun ChatSmallToolbar(onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(60.dp)
-            .pointerInput(Unit) {
-                detectTapGestures { onClick }
-            }
-    ) {
+    Surface(modifier = Modifier
+        .fillMaxWidth()
+        .height(60.dp)
+        .pointerInput(Unit) {
+            detectTapGestures { onClick }
+        }) {
         Row(
             modifier = Modifier
                 .padding(start = 12.dp)

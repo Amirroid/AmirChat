@@ -228,7 +228,7 @@ fun UserListItem(
         trailingContent = {
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = room.lastTime.formatDateTime(),
+                    text = if (room.lastTime == 0L) "" else room.lastTime.formatDateTime(),
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.alpha(0.7f),
                     maxLines = 1,

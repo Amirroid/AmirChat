@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -86,7 +87,7 @@ fun ForwardScreen(
             AnimatedVisibility(
                 visible = selectedRooms.isNotEmpty(),
                 enter = scaleIn(),
-                exit = fadeOut()
+                exit = scaleOut()
             ) {
                 FloatingActionButton(onClick = {
                     viewModel.sendMessages(messages) {

@@ -96,6 +96,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.Coil
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -136,6 +137,7 @@ import ir.amirroid.amirchat.utils.getName
 import ir.amirroid.amirchat.utils.getShapeOfMessage
 import ir.amirroid.amirchat.utils.getTextColorOfMessage
 import ir.amirroid.amirchat.utils.getType
+import ir.amirroid.amirchat.utils.startLongPress
 import ir.amirroid.amirchat.utils.toDp
 import ir.amirroid.amirchat.viewmodels.ChatViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -160,6 +162,7 @@ fun MessageView(
     uploadFiles: HashMap<String, FileNetData>,
 ) {
     val context = LocalContext.current
+    val hapticFeedback = LocalHapticFeedback.current
     var size by remember {
         mutableFloatStateOf(0f)
     }
@@ -196,15 +199,20 @@ fun MessageView(
                 if (message.status != Constants.SENDING && selectionMode.not()) {
                     lastOffset = it
                     onMessageEvent?.invoke(MessageEvents.LongClick(message))
+                } else {
+                    hapticFeedback.startLongPress()
                 }
             }, onTap = {
-                if (selectionMode) {
-                    if (message.status != Constants.SENDING) {
+                if (message.status != Constants.SENDING) {
+                    if (selectionMode) {
                         lastOffset = it
                         onMessageEvent?.invoke(MessageEvents.LongClick(message))
+
+                    } else {
+                        onMessageEvent?.invoke(MessageEvents.Click(message, position))
                     }
                 } else {
-                    onMessageEvent?.invoke(MessageEvents.Click(message, position))
+                    hapticFeedback.startLongPress()
                 }
             }, onDoubleTap = {
                 onMessageEvent?.invoke(MessageEvents.SetEmoji(message, getEmoji(0X1F44D)))
@@ -391,6 +399,10 @@ fun RowScope.MessageView(
                 ) { offset, size, file ->
                     onContentClick?.invoke(offset, size, Pair(message, file))
                 }
+            } else {
+                if (message.forwardFrom == null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             }
             Column(
                 modifier = Modifier
@@ -398,7 +410,7 @@ fun RowScope.MessageView(
                         if (message.files.isNotEmpty()) Modifier.fillMaxWidth() else Modifier.wrapContentWidth()
                     )
                     .padding(horizontal = 12.dp)
-                    .padding(bottom = 8.dp, top = 2.dp)
+                    .padding(bottom = 8.dp)
             ) {
                 if (message.message.isNotEmpty()) {
                     SelectionContainer(selectionMode) {
@@ -888,10 +900,10 @@ fun GalleryView(
 ) {
     val files = message.files
     val context = LocalContext.current
-    val videoLoader = ImageLoader.Builder(context).components {
+    val videoLoader = Coil.imageLoader(context).newBuilder().components {
         add(VideoFrameDecoder.Factory())
     }.build()
-    val imageLoader = ImageLoader.Builder(context).build()
+    val imageLoader = Coil.imageLoader(context)
     Box(
         modifier = Modifier
             .padding(4.dp)
@@ -916,7 +928,6 @@ fun GalleryView(
                         videoLoader.enqueue(request)
                     }
                     val request = ImageRequest.Builder(context).data(files.first().path)
-                        .diskCachePolicy(CachePolicy.ENABLED)
                         .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
                     videoLoader.enqueue(request)
                 } else {
@@ -924,7 +935,6 @@ fun GalleryView(
                         bitmap = BitmapFactory.decodeFile(files.first().fromPath)
                     }
                     val request = ImageRequest.Builder(context).data(files.first().path)
-                        .diskCachePolicy(CachePolicy.ENABLED).memoryCachePolicy(CachePolicy.ENABLED)
                         .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
                     imageLoader.enqueue(request)
                 }
@@ -997,7 +1007,6 @@ fun GalleryView(
                                     videoLoader.enqueue(request)
                                 }
                                 val request = ImageRequest.Builder(context).data(files[index].path)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
                                     .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
                                 videoLoader.enqueue(request)
                             } else {
@@ -1005,8 +1014,6 @@ fun GalleryView(
                                     bitmap = BitmapFactory.decodeFile(files[index].fromPath)
                                 }
                                 val request = ImageRequest.Builder(context).data(files[index].path)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                    .memoryCachePolicy(CachePolicy.ENABLED)
                                     .target { b -> bitmap = (b as BitmapDrawable).bitmap }.build()
                                 imageLoader.enqueue(request)
                             }
@@ -1033,8 +1040,6 @@ fun GalleryView(
                                 }
                                 val request =
                                     ImageRequest.Builder(context).data(files[index.plus(1)].path)
-                                        .diskCachePolicy(CachePolicy.ENABLED)
-                                        .memoryCachePolicy(CachePolicy.ENABLED)
                                         .target { b -> bitmap2 = (b as BitmapDrawable).bitmap }
                                         .build()
                                 imageLoader.enqueue(request)

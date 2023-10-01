@@ -53,4 +53,8 @@
     <string name="edit">Edit</string>
     <string name="forward_to">Forward To...</string>
     <string name="forward_from">Forward from</string>
+    <string name="mark_as_read">Mark as read</string>
+    <string name="mute">Mute</string>
+    <string name="unmute">Unmute</string>
+    <string name="delete_messages">Delete messages</string>
 </resources>

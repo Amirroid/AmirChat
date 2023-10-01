@@ -1,6 +1,8 @@
 package ir.amirroid.amirchat.di
 
 import android.content.Context
+import coil.ImageLoader
+import coil.request.CachePolicy
 import com.google.firebase.database.ktx.database
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
@@ -65,4 +67,17 @@ object NetModule {
     fun provideMessaging(
         firebase: Firebase
     ) = firebase.messaging
+
+
+    @Provides
+    @Singleton
+    fun provideImageLoader(
+        @ApplicationContext context: Context
+    ) =
+        ImageLoader.Builder(context)
+            .respectCacheHeaders(false)
+            .allowHardware(true)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .build()
 }

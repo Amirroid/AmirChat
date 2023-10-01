@@ -22,8 +22,13 @@ data class ChatRoom(
         fromNotificationEnabled
     } else toNotificationEnabled
 
+    fun toNotificationEnabled() = if (from.token == CurrentUser.token) {
+        toNotificationEnabled
+    } else fromNotificationEnabled
+
     fun getUser() = if (from.token == CurrentUser.token) {
         from
     } else to
+
     fun getToChatUser() = if (from.token == CurrentUser.token) to else from
 }
