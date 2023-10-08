@@ -8,18 +8,22 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import ir.amirroid.amirchat.data.auth.AuthManager
 import ir.amirroid.amirchat.data.helpers.TokenHelper
 import ir.amirroid.amirchat.data.models.chat.ChatRoom
+import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.repositories.chats.ChatRepository
 import ir.amirroid.amirchat.data.repositories.users.UsersRepository
 import ir.amirroid.amirchat.utils.Constants
+import ir.amirroid.amirchat.utils.id
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    tokenHelper: TokenHelper,
+    private val tokenHelper: TokenHelper,
     private val chatRepository: ChatRepository
 ) : ViewModel() {
     val user = tokenHelper.user
@@ -41,7 +45,7 @@ class HomeViewModel @Inject constructor(
 
     private fun observeToRooms() {
         chatRepository.observeToRooms {
-            _rooms.value = it
+            _rooms.value = it.sortedByDescending { model -> model.lastTime and if (model.id == CurrentUser.token) 1 else 0}
             chatRepository.observeToNumberOfMessages(it) { data ->
                 _numbersOfChats.value = data
                 Log.d("sdfjodj", "observeToRooms: $data")
@@ -76,5 +80,22 @@ class HomeViewModel @Inject constructor(
 
     fun setNotificationEnabled(enabled: Boolean, room: ChatRoom) {
         chatRepository.setMyNotificationEnabled(enabled, room)
+    }
+
+    fun logOut() = viewModelScope.launch(Dispatchers.IO) {
+        tokenHelper.logOut()
+    }
+
+    fun getSavedMessage(callback: (ChatRoom) -> Unit) {
+        if (_rooms.value.any { it.id == CurrentUser.token }) {
+            val room = _rooms.value.firstOrNull { it.id == CurrentUser.token }
+            if (room == null) {
+                chatRepository.createSavedMessageRoom(callback)
+            } else {
+                callback.invoke(room)
+            }
+        } else {
+            chatRepository.createSavedMessageRoom(callback)
+        }
     }
 }

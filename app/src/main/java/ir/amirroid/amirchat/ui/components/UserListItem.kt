@@ -49,6 +49,8 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -62,6 +64,7 @@ import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.utils.Profile
 import ir.amirroid.amirchat.utils.formatDateTime
 import ir.amirroid.amirchat.utils.getName
+import ir.amirroid.amirchat.utils.id
 import ir.amirroid.amirchat.utils.toDp
 
 @SuppressLint("UnusedContentLambdaTargetStateParameter")
@@ -183,20 +186,20 @@ fun UserListItem(
     } else room.from
     ListItem(headlineContent = {
         Text(
-            text = user.getName(),
+            text = if (room.id == CurrentUser.token) stringResource(id = R.string.saved_messages) else user.getName(),
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            fontWeight = FontWeight.Bold
         )
     }, leadingContent = {
-        Box(contentAlignment = Alignment.BottomEnd) {
+        Box(contentAlignment = Alignment.BottomCenter) {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(user.profilePictureUrl)
-                    .memoryCachePolicy(CachePolicy.ENABLED)
+                model = ImageRequest.Builder(context)
+                    .data(if (room.id == CurrentUser.token) R.drawable.saved_messages else user.profilePictureUrl)
                     .placeholder(R.drawable.user_default)
                     .error(R.drawable.user_default)
-                    .diskCachePolicy(CachePolicy.ENABLED)
                     .crossfade(true)
-                    .crossfade(300).build(),
+                    .crossfade(200).build(),
                 contentDescription = null,
                 modifier = Modifier
                     .size(50.dp)

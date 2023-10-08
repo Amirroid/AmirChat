@@ -61,21 +61,24 @@ class ForwardViewModel @Inject constructor(
         loading = true
         selectedRooms.forEachIndexed { i, room ->
             messages.forEach { message ->
-                chatRepository.addMessageWithOutFiles(
-                    message.copy(
-                        status = Constants.SEND,
-                        from = CurrentUser.token ?: "",
-                        date = System.currentTimeMillis(),
-                        fromEmoji = null,
-                        toEmoji = null,
-                        id = System.currentTimeMillis().toString() + room.id,
-                        chatRoom = room.id,
-                    ),
-                    room.getToChatUser().fcmToken,
-                ) {
-                    if (i.plus(1) == selectedRooms.size) {
-                        onEnd.invoke()
-                        loading = false
+                chatRepository.getSizeOfRoom(room.id){
+                    chatRepository.addMessageWithOutFiles(
+                        message.copy(
+                            status = Constants.SEND,
+                            from = CurrentUser.token ?: "",
+                            date = System.currentTimeMillis(),
+                            fromEmoji = null,
+                            toEmoji = null,
+                            id = System.currentTimeMillis().toString() + room.id,
+                            chatRoom = room.id,
+                            index = it
+                        ),
+                        room.getToChatUser().fcmToken,
+                    ) {
+                        if (i.plus(1) == selectedRooms.size) {
+                            onEnd.invoke()
+                            loading = false
+                        }
                     }
                 }
             }

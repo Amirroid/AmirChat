@@ -70,4 +70,10 @@ class TokenHelper @Inject constructor(
             it[Keys.user] = Gson().toJson(user)
         }
     }
+
+    suspend fun logOut() {
+        preferences.edit {
+            it.remove(Keys.user)
+        }
+    }
 }

@@ -4,6 +4,7 @@ import android.os.Parcelable
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.utils.Constants
 import kotlinx.parcelize.Parcelize
@@ -25,4 +26,12 @@ data class MessageModel(
     val index: Int = 1,
     @Embedded
     val forwardFrom: UserModel? = null
-):Parcelable
+) : Parcelable {
+    fun isMyMessage(): Boolean {
+        return if (chatRoom == CurrentUser.token) {
+            replyToId == null
+        } else {
+            from == CurrentUser.token
+        }
+    }
+}

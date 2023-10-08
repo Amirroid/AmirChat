@@ -38,6 +38,7 @@ object Constants {
     const val PROFILE = "profile"
     const val QR_CODE = "qrcode"
     const val FORWARD = "forward"
+    const val SETTINGS = "settings"
 
     // preferences
     const val CATCH_NAME = "catch"

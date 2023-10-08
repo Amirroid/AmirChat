@@ -183,7 +183,7 @@ fun MessageView(
         }
     }
     LaunchedEffect(key1 = message) {
-        if (message.status != Constants.SEEN && isMyUser.not()) {
+        if (message.status == Constants.SEND && isMyUser.not()) {
             onMessageEvent?.invoke(MessageEvents.Seen(message.id))
         }
     }

@@ -991,7 +991,8 @@ fun MediaView(
             .fillMaxWidth()
             .aspectRatio(1f)
     ) {
-        AsyncImage(model = ImageRequest.Builder(context).crossfade(200).crossfade(true).data(image)
+        AsyncImage(model = ImageRequest.Builder(context).diskCachePolicy(CachePolicy.DISABLED)
+            .memoryCachePolicy(CachePolicy.DISABLED).crossfade(200).crossfade(true).data(image)
             .build(),
             contentDescription = "Image",
             modifier = Modifier

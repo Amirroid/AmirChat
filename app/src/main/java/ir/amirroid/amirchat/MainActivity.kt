@@ -41,6 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import coil.ImageLoader
+import coil.compose.LocalImageLoader
 import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
@@ -58,6 +60,7 @@ import ir.amirroid.amirchat.ui.features.profile.ProfileScreen
 import ir.amirroid.amirchat.ui.features.qr_code.QrCodeProfileScreen
 import ir.amirroid.amirchat.ui.features.register.RegisterScreen
 import ir.amirroid.amirchat.ui.features.search.SearchScreen
+import ir.amirroid.amirchat.ui.features.settings.SettingsScreen
 import ir.amirroid.amirchat.ui.theme.AmirChatTheme
 import ir.amirroid.amirchat.utils.ChatPages
 import javax.inject.Inject
@@ -66,6 +69,9 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     @Inject
     lateinit var authManager: AuthManager
+
+    @Inject
+    lateinit var imageLoader:ImageLoader
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,13 +83,15 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .imePadding()
-                            .background(MaterialTheme.colorScheme.background)
-                    ) {
-                        MainScreen(authManager)
+                    CompositionLocalProvider(value = LocalImageLoader provides imageLoader) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .imePadding()
+                                .background(MaterialTheme.colorScheme.background)
+                        ) {
+                            MainScreen(authManager)
+                        }
                     }
                 }
             }
@@ -179,6 +187,9 @@ fun MainScreen(authManager: AuthManager) {
         )) {
             val argument = Gson().fromJson(it.arguments?.getString("messages") ?: "[]", Array<MessageModel>::class.java)
             ForwardScreen(messages = argument?.toList() ?: emptyList(), navController)
+        }
+        composable(ChatPages.SettingsScreen.route){
+            SettingsScreen(navigation = navController)
         }
     }
 }

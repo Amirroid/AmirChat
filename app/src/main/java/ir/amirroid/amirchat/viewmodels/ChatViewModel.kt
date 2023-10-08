@@ -50,11 +50,11 @@ import javax.inject.Inject
 class ChatViewModel @Inject constructor(
     @ApplicationContext val context: Context,
     private val fileRepository: FileRepository,
-    private val musicHelper: MusicHelper,
+    val musicHelper: MusicHelper,
     private val recorderHelper: RecorderHelper,
     private val chatRepository: ChatRepository,
     private val downloadHelper: DownloadHelper,
-    private val userRepository: UsersRepository
+    private val userRepository: UsersRepository,
 ) : ViewModel() {
 
     private val _chats = MutableStateFlow<List<MessageModel>>(emptyList())
@@ -133,7 +133,9 @@ class ChatViewModel @Inject constructor(
         user: UserModel
     ) {
         toUser = user
-        observeToStatus()
+        if (user.isSavedMessageUser().not()){
+            observeToStatus()
+        }
         if (room == null) {
             chatRepository.addRoomWithUser(
                 user
@@ -160,7 +162,7 @@ class ChatViewModel @Inject constructor(
             }
             chatRepository.observeToChat(room) {
                 _chats.value = it.toMutableList().addAllIf(
-                    it
+                    sendingMessages
                 ) { message ->
                     any { model -> model.id == message.id }.not()
                 }.sortedBy { message -> message.index }
@@ -438,5 +440,37 @@ class ChatViewModel @Inject constructor(
             }
         }
         selectedList.value = order
+    }
+
+    fun deleteChats() {
+        _room.value?.id?.let {
+            chatRepository.deleteChats(it)
+        }
+    }
+
+    fun markAsRead() {
+        _room.value?.id?.let {
+            chatRepository.markAsRead(it)
+        }
+    }
+
+    fun deleteRoom() {
+        _room.value?.let {
+            chatRepository.deleteRoom(it)
+        }
+    }
+
+    fun saveMessage(message: MessageModel, onResponse: () -> Unit){
+        val copyMessage = message.copy(
+            chatRoom = CurrentUser.token ?: "",
+            date = System.currentTimeMillis(),
+            replyToId = message.from,
+            from = message.from,
+            id = System.currentTimeMillis().toString() + CurrentUser.token,
+            toEmoji = null,
+            fromEmoji = null,
+            status = Constants.SEEN
+        )
+        chatRepository.addSavedMessage(copyMessage, onResponse)
     }
 }

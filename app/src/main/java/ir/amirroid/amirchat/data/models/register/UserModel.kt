@@ -14,4 +14,6 @@ data class UserModel(
     var bio: String = "",
     var profilePictureUrl: String? = null,
     val fcmToken: String = "",
-):Parcelable
+):Parcelable {
+    fun isSavedMessageUser() = token.isEmpty() || token == CurrentUser.token
+}

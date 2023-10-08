@@ -24,6 +24,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,6 +38,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
@@ -45,6 +47,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SmallTopAppBar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -72,6 +75,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.AudioAttributes
@@ -80,6 +84,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
@@ -92,6 +97,7 @@ import coil.request.ImageRequest
 import ir.amirroid.amirchat.data.models.chat.FileMessage
 import ir.amirroid.amirchat.data.models.chat.MessageModel
 import ir.amirroid.amirchat.data.models.register.CurrentUser
+import ir.amirroid.amirchat.utils.formatTime
 import ir.amirroid.amirchat.utils.getType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -110,6 +116,8 @@ fun ChatMediaPopUp(
     offset: Offset,
     file: FileMessage?,
     message: MessageModel?,
+    exoPlayer: ExoPlayer,
+    cacheDataSource: CacheDataSource.Factory,
     onDismissRequest: () -> Unit,
 ) {
     val pagerState = rememberPagerState(initialPage = message?.files?.indexOf(file) ?: 1) {
@@ -142,15 +150,15 @@ fun ChatMediaPopUp(
     LaunchedEffect(key1 = playButtonShow) {
         if (playButtonShow) {
             delay(3000)
-            if (pagerState.isScrollInProgress.not()){
+            if (pagerState.isScrollInProgress.not()) {
                 playButtonShow = false
             }
         }
     }
-    LaunchedEffect(key1 = pagerState.isScrollInProgress ){
-        playButtonShow = if (pagerState.isScrollInProgress){
+    LaunchedEffect(key1 = pagerState.isScrollInProgress) {
+        playButtonShow = if (pagerState.isScrollInProgress) {
             true
-        }else{
+        } else {
             delay(500)
             false
         }
@@ -161,7 +169,9 @@ fun ChatMediaPopUp(
             pagerState,
             play,
             it,
-            changeProgress
+            exoPlayer = exoPlayer,
+            changeProgress,
+            cacheDataSource
         ) { cProgress, cDuration, isPlay ->
             progress = cProgress
             duration = cDuration
@@ -221,7 +231,9 @@ fun ChatMediaPopUp(
                             state = lazyListState,
                             flingBehavior = flingBehavior,
                             horizontalArrangement = Arrangement.Center,
-                            modifier = Modifier.wrapContentSize().align(Alignment.CenterHorizontally)
+                            modifier = Modifier
+                                .wrapContentSize()
+                                .align(Alignment.CenterHorizontally)
                         ) {
                             items(files.size) {
                                 val currentFile = files[it]
@@ -263,9 +275,32 @@ fun ChatMediaPopUp(
                             visible = files.getOrNull(pagerState.currentPage)?.path?.getType()
                                 ?.startsWith("video") == true
                         ) {
-                            Slider(value = progress.toFloat(), onValueChange = {
-                                changeProgress = it.toLong()
-                            }, valueRange = 0f..duration.toFloat())
+                            Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = progress.formatTime(), color = Color.White)
+                                    Text(text = duration.formatTime(), color = Color.White)
+                                }
+                                val mis = remember {
+                                    MutableInteractionSource()
+                                }
+                                Slider(
+                                    value = progress.toFloat().coerceAtLeast(0f),
+                                    onValueChange = {
+                                        changeProgress = it.toLong()
+                                    },
+                                    valueRange = 0f..duration.toFloat().coerceAtLeast(0f),
+                                    colors = SliderDefaults.colors(
+                                        activeTrackColor = Color.White,
+                                        inactiveTrackColor = Color.White.copy(0.5f),
+                                        thumbColor = Color.White,
+                                    ),
+                                )
+                            }
                         }
                     }
                 }
@@ -336,7 +371,9 @@ fun MediaContent(
     pagerState: PagerState,
     play: Boolean,
     show: Boolean,
+    exoPlayer: ExoPlayer,
     progress: Long,
+    cacheDataSource: CacheDataSource.Factory,
     onEvent: (Long, Long, Boolean) -> Unit
 ) {
     val context = LocalContext.current
@@ -352,7 +389,9 @@ fun MediaContent(
                     file,
                     onEvent,
                     play,
-                    progress
+                    progress,
+                    exoPlayer,
+                    cacheDataSource
                 )
             } else {
                 onEvent.invoke(0L, 1L, false)
@@ -405,18 +444,31 @@ fun VideoView(
     file: FileMessage,
     onEvent: (Long, Long, Boolean) -> Unit,
     play: Boolean,
-    progress: Long
+    progress: Long,
+    exoPlayer: ExoPlayer,
+    cacheDataSource: CacheDataSource.Factory,
 ) {
-    val path = if (isMyFrom && File(file.fromPath).exists()) {
-        file.fromPath
-    } else file.path
-    Log.d("voisduwi", "VideoView: $path")
-    VideoViewBasic(
-        videoUri = Uri.parse(path),
-        changePosition = progress,
-        onVideoEvent = { d, c, p ->
-            onEvent.invoke(c, d, p)
-        },
-        play = play
-    )
+    if (isMyFrom && File(file.fromPath).exists()) {
+        VideoViewBasic(
+            videoUri = Uri.parse(file.fromPath),
+            changePosition = progress,
+            onVideoEvent = { d, c, p ->
+                onEvent.invoke(c, d, p)
+            },
+            play = play,
+            exoplayer = exoPlayer
+        )
+    } else {
+        VideoViewBasicWithSource(
+            mediaSource = ProgressiveMediaSource.Factory(cacheDataSource).createMediaSource(
+                MediaItem.fromUri(Uri.parse(file.path))
+            ),
+            changePosition = progress,
+            onVideoEvent = { d, c, p ->
+                onEvent.invoke(c, d, p)
+            },
+            play = play,
+            exoplayer = exoPlayer
+        )
+    }
 }

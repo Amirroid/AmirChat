@@ -57,4 +57,7 @@
     <string name="mute">Mute</string>
     <string name="unmute">Unmute</string>
     <string name="delete_messages">Delete messages</string>
+    <string name="message_is_saved">Message is saved</string>
+    <string name="log_out">Log out</string>
+    <string name="wait_for_loading">Wait for loading</string>
 </resources>

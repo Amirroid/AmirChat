@@ -165,7 +165,7 @@ fun Size.toDpSize(density: Density) = DpSize(
 fun UserModel.getName() = "$firstName $lastName"
 
 val ChatRoom.id: String
-    get() = "${this.from.token}-${this.to.token}"
+    get() = "${this.from.token}${(if (this.to.token.isEmpty()) "" else "-") + this.to.token}"
 
 
 fun MusicModel.toJsonMusic() = MusicModelForJson(

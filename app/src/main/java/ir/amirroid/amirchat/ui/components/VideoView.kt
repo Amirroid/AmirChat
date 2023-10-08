@@ -1,6 +1,6 @@
 package ir.amirroid.amirchat.ui.components
 
-import android.media.session.PlaybackState
+import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -17,6 +17,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 
@@ -32,14 +33,14 @@ fun VideoViewBasic(
         play: Boolean
     ) -> Unit,
     play: Boolean = true,
-    playPause : Boolean =  false,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val exoplayer = remember {
+    playPause: Boolean = false,
+    modifier: Modifier = Modifier,
+    context : Context = LocalContext.current,
+    exoplayer: ExoPlayer = remember {
         ExoPlayer.Builder(context)
             .build()
     }
+) {
     val listener = remember {
         object : Player.Listener {
             override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
@@ -48,7 +49,7 @@ fun VideoViewBasic(
                     exoplayer.currentPosition,
                     exoplayer.isPlaying
                 )
-                if (playbackState == ExoPlayer.STATE_ENDED){
+                if (playbackState == ExoPlayer.STATE_ENDED) {
                     exoplayer.seekTo(0L)
                     exoplayer.playWhenReady = false
                 }
@@ -56,7 +57,7 @@ fun VideoViewBasic(
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                Log.e("voisduwi", "onPlayerError: ${error.message}", )
+                Log.e("voisduwi", "onPlayerError: ${error.message}")
                 super.onPlayerError(error)
             }
         }
@@ -71,13 +72,13 @@ fun VideoViewBasic(
                 exoplayer.currentPosition,
                 exoplayer.isPlaying
             )
-            delay(500)
+            delay(490)
         }
     }
-    LaunchedEffect(key1 = play){
-        if(play){
+    LaunchedEffect(key1 = play) {
+        if (play) {
             exoplayer.play()
-        }else exoplayer.pause()
+        } else exoplayer.pause()
     }
     DisposableEffect(key1 = Unit) {
         exoplayer.setMediaItem(MediaItem.fromUri(videoUri))
@@ -87,7 +88,6 @@ fun VideoViewBasic(
             exoplayer.apply {
                 removeListener(listener)
                 stop()
-                release()
             }
         }
     }
@@ -100,7 +100,95 @@ fun VideoViewBasic(
         }
         playerView
     }, modifier = modifier.pointerInput(Unit) {
-        if (playPause){
+        if (playPause) {
+            detectTapGestures {
+                if (exoplayer.isPlaying) {
+                    exoplayer.pause()
+                } else exoplayer.play()
+            }
+        }
+    })
+}
+
+@UnstableApi
+@Composable
+fun VideoViewBasicWithSource(
+    mediaSource:ProgressiveMediaSource,
+    changePosition: Long,
+    onVideoEvent: (
+        duration: Long,
+        currentPosition: Long,
+        play: Boolean
+    ) -> Unit,
+    play: Boolean = true,
+    playPause: Boolean = false,
+    modifier: Modifier = Modifier,
+    context : Context = LocalContext.current,
+    exoplayer: ExoPlayer = remember {
+        ExoPlayer.Builder(context)
+            .build()
+    }
+) {
+    val listener = remember {
+        object : Player.Listener {
+            override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
+                onVideoEvent.invoke(
+                    exoplayer.duration,
+                    exoplayer.currentPosition,
+                    exoplayer.isPlaying
+                )
+                if (playbackState == ExoPlayer.STATE_ENDED) {
+                    exoplayer.seekTo(0L)
+                    exoplayer.playWhenReady = false
+                }
+                super.onPlayerStateChanged(playWhenReady, playbackState)
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                Log.e("voisduwi", "onPlayerError: ${error.message}")
+                super.onPlayerError(error)
+            }
+        }
+    }
+    LaunchedEffect(key1 = changePosition) {
+        exoplayer.seekTo(changePosition)
+    }
+    LaunchedEffect(key1 = Unit) {
+        repeat(Int.MAX_VALUE) {
+            onVideoEvent.invoke(
+                exoplayer.duration,
+                exoplayer.currentPosition,
+                exoplayer.isPlaying
+            )
+            delay(490)
+        }
+    }
+    LaunchedEffect(key1 = play) {
+        if (play) {
+            exoplayer.play()
+        } else exoplayer.pause()
+    }
+    DisposableEffect(key1 = Unit) {
+        exoplayer.setMediaSource(mediaSource)
+        exoplayer.prepare()
+        exoplayer.addListener(listener)
+        onDispose {
+            exoplayer.apply {
+                removeListener(listener)
+                stop()
+            }
+        }
+    }
+    AndroidView(factory = {
+        val playerView = PlayerView(it)
+        playerView.apply {
+            player = exoplayer
+            useController = false
+            hideController()
+        }
+        playerView
+    }, modifier = modifier.pointerInput(Unit) {
+        if (playPause) {
             detectTapGestures {
                 if (exoplayer.isPlaying) {
                     exoplayer.pause()

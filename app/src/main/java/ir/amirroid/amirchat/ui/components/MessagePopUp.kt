@@ -227,7 +227,7 @@ fun MessagePopUp(
                     }
                     DropdownMenuItem(
                         text = { Text(text = stringResource(id = R.string.save)) },
-                        onClick = { },
+                        onClick = { onEvent.invoke(MessagePopUpEvent.SAVE) },
                         leadingIcon = {
                             Icon(
                                 painter = painterResource(id = R.drawable.round_bookmark_border_24),
@@ -256,5 +256,6 @@ enum class MessagePopUpEvent {
     COPY,
     REPLY,
     EDIT,
-    FORWARD
+    FORWARD,
+    SAVE
 }

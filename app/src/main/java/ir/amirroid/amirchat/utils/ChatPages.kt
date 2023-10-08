@@ -9,4 +9,5 @@ sealed class ChatPages(val route: String) {
     object ProfileScreen : ChatPages(Constants.PROFILE)
     object QrCodeProfileScreen : ChatPages(Constants.QR_CODE)
     object ForwardScreen: ChatPages(Constants.FORWARD)
+    object SettingsScreen: ChatPages(Constants.SETTINGS)
 }

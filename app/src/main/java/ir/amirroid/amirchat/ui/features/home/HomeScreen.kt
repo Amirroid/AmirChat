@@ -2,6 +2,7 @@ package ir.amirroid.amirchat.ui.features.home
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -71,6 +72,7 @@ import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.google.gson.Gson
+import ir.amirroid.amirchat.MainActivity
 import ir.amirroid.amirchat.R
 import ir.amirroid.amirchat.data.models.chat.ChatRoom
 import ir.amirroid.amirchat.data.models.register.CurrentUser
@@ -131,7 +133,31 @@ fun HomeScreen(
                 profileImage ?: "",
                 phoneNumber ?: "",
                 "$firstName $lastName"
-            )
+            ) {
+                when (it) {
+                    1 -> navigation.navigate(ChatPages.SettingsScreen.route)
+                    2 -> {
+                        viewModel.getSavedMessage { room ->
+                            navigation.navigate(
+                                ChatPages.ChatScreen.route + "?id=" + room.id + "&user=" + Gson().toJson(
+                                    CurrentUser.user
+                                )
+                            )
+                        }
+                    }
+
+                    3 -> {
+                        viewModel.logOut()
+                        val intent = Intent(context, MainActivity::class.java)
+                        intent.flags =
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP.or(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                    }
+                }
+                scope.launch {
+                    drawerState.close()
+                }
+            }
         },
         drawerState = drawerState,
         modifier = Modifier.blur(blurChats)
@@ -254,6 +280,7 @@ fun HomeScreen(
                 selectedChatPopUp.myNotificationEnabled().not(),
                 selectedChatPopUp
             )
+
             3 -> viewModel.markAsRead(selectedChatPopUp.id)
             4 -> viewModel.deleteRoom(selectedChatPopUp)
         }
@@ -267,7 +294,8 @@ fun DrawerContent(
     context: Context,
     image: String,
     phoneNumber: String,
-    name: String
+    name: String,
+    onEvent: (Int) -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -289,8 +317,6 @@ fun DrawerContent(
                         .crossfade(true)
                         .placeholder(R.drawable.user_default)
                         .error(R.drawable.user_default)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
                         .crossfade(500)
                         .build(),
                     contentDescription = "profile",
@@ -317,7 +343,7 @@ fun DrawerContent(
             NavigationDrawerItem(
                 label = { Text(text = stringResource(id = R.string.settings)) },
                 selected = false,
-                onClick = { },
+                onClick = { onEvent.invoke(1) },
                 modifier = Modifier
                     .padding(top = 12.dp)
                     .padding(horizontal = 12.dp)
@@ -325,7 +351,20 @@ fun DrawerContent(
             NavigationDrawerItem(
                 label = { Text(text = stringResource(id = R.string.saved_messages)) },
                 selected = false,
-                onClick = { },
+                onClick = { onEvent.invoke(2) },
+                modifier = Modifier
+                    .padding(top = 6.dp)
+                    .padding(horizontal = 12.dp)
+            )
+            NavigationDrawerItem(
+                label = {
+                    Text(
+                        text = stringResource(id = R.string.log_out),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                },
+                selected = false,
+                onClick = { onEvent.invoke(3) },
                 modifier = Modifier
                     .padding(top = 6.dp)
                     .padding(horizontal = 12.dp)

@@ -570,4 +570,81 @@ class ChatRepository @Inject constructor(
 
             })
     }
+
+    fun addSavedMessage(
+        message: MessageModel,
+        onResponse: () -> Unit
+    ) {
+        scope.launch {
+            sendingMessagesDao.add(message.copy(status = Constants.SENDING))
+        }
+        checkSavedMessage { successful, size ->
+            if (successful) {
+                chats.child(
+                    message.id
+                ).setValue(
+                    message.copy(
+                        files = message.files,
+                        index = size
+                    )
+                ).addOnCompleteListener {
+                    onResponse.invoke()
+                    scope.launch {
+                        sendingMessagesDao.delete(message)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun checkSavedMessage(callback: (Boolean, Int) -> Unit) {
+        CurrentUser.user?.let { user ->
+            rooms.child(user.token).addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (snapshot.exists()) {
+                        callback.invoke(true, snapshot.children.count())
+                    } else {
+                        snapshot.ref.setValue(
+                            ChatRoom(
+                                user,
+                                fromNotificationEnabled = false,
+                                toNotificationEnabled = false
+                            )
+                        ).addOnCompleteListener {
+                            callback.invoke(it.isSuccessful, 0)
+                        }
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    callback.invoke(false, -1)
+                }
+            })
+        }
+    }
+
+    fun createSavedMessageRoom(callback: (ChatRoom) -> Unit) {
+        CurrentUser.user?.let { user ->
+            val room = ChatRoom(
+                    user,
+                    fromNotificationEnabled = false,
+                    toNotificationEnabled = false
+                )
+            rooms.child(user.token).setValue(
+                room
+            ).addOnSuccessListener {
+                callback.invoke(room)
+            }
+        }
+    }
+
+    fun getSizeOfRoom(chatRoom: String, onCallback: (Int) -> Unit) {
+        rooms.child(chatRoom).addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                onCallback.invoke(snapshot.children.count())
+            }
+
+            override fun onCancelled(error: DatabaseError) = Unit
+        })
+    }
 }

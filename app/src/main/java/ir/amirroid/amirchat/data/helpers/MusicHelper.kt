@@ -19,9 +19,9 @@ import javax.inject.Singleton
 @Singleton
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class MusicHelper @Inject constructor(
-    private val exoPlayer: ExoPlayer,
+    val exoPlayer: ExoPlayer,
     private val dataSource: DefaultDataSource.Factory,
-    private val cacheDataSource: CacheDataSource.Factory
+    val cacheDataSource: CacheDataSource.Factory
 ) {
     var onEvent: ((Int) -> Unit)? = null
     private val listener = object : Player.Listener {
@@ -97,7 +97,8 @@ class MusicHelper @Inject constructor(
     fun getPosition() = exoPlayer.currentPosition
     fun playWithCache(path: String) {
         exoPlayer.setMediaSource(
-            ProgressiveMediaSource.Factory(cacheDataSource).createMediaSource(MediaItem.fromUri(path.toUri()))
+            ProgressiveMediaSource.Factory(cacheDataSource)
+                .createMediaSource(MediaItem.fromUri(path.toUri()))
         )
         exoPlayer.playWhenReady = true
         exoPlayer.prepare()

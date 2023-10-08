@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
@@ -50,6 +51,8 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -293,12 +296,23 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
             Box {
                 AppBarChat(user = user, status = status, {
                     navigation.popBackStack()
-                }) {
-                    navigation.navigate(
-                        ChatPages.ProfileScreen.route + "?user=" + Gson().toJson(
-                            user
+                }, {
+                    if (user.isSavedMessageUser().not()){
+                        navigation.navigate(
+                            ChatPages.ProfileScreen.route + "?user=" + Gson().toJson(
+                                user
+                            )
                         )
-                    )
+                    }
+                }) {
+                    when (it) {
+                        1 -> viewModel.deleteChats()
+                        2 -> viewModel.markAsRead()
+                        3 -> {
+                            viewModel.deleteRoom()
+                            navigation.popBackStack()
+                        }
+                    }
                 }
                 AnimatedVisibility(
                     visible = selectedList.isNotEmpty(), enter = fadeIn(), exit = fadeOut()
@@ -477,6 +491,7 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
             uploadFiles = uploadFiles,
         )
     }
+    val savedMessageText = stringResource(id = R.string.message_is_saved)
     MessagePopUp(offset = popUpChat,
         context,
         popUpChat != Offset.Zero,
@@ -517,6 +532,16 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                     }
                     viewModel.deleteMessages(listOf(selectedMessage ?: MessageModel()))
                 }
+
+                MessagePopUpEvent.SAVE -> {
+                    selectedMessage?.let { message ->
+                        viewModel.saveMessage(message){
+                            scope.launch {
+                                snackBarState.showSnackbar(savedMessageText)
+                            }
+                        }
+                    }
+                }
             }
             selectedMessage = null
             popUpChat = Offset.Zero
@@ -545,7 +570,9 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
         size = sizeChatMedia,
         offset = offsetChatMedia,
         message = popUpMedia?.first,
-        file = popUpMedia?.second
+        file = popUpMedia?.second,
+        exoPlayer = viewModel.musicHelper.exoPlayer,
+        cacheDataSource = viewModel.musicHelper.cacheDataSource,
     ) {
         showChatMedia = false
     }
@@ -799,16 +826,22 @@ fun TextFieldChat(
     }
 }
 
+@SuppressLint("UnusedCrossfadeTargetStateParameter")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppBarChat(
     user: UserModel,
     status: UserStatus?,
     onBack: () -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    onEventListener: (Int) -> Unit
 ) {
     val appBarColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
     val context = LocalContext.current
+    var expandMenu by remember {
+        mutableStateOf(false)
+    }
+    val savedMessage = user.isSavedMessageUser()
     SmallTopAppBar(title = {
         Row(modifier = Modifier
             .padding(start = 4.dp)
@@ -816,14 +849,12 @@ fun AppBarChat(
                 detectTapGestures {
                     onProfileClick.invoke()
                 }
-            }) {
+            }, verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
                 model = ImageRequest.Builder(context)
-                    .diskCachePolicy(CachePolicy.ENABLED)
-                    .memoryCachePolicy(CachePolicy.ENABLED)
                     .placeholder(R.drawable.user_default)
                     .error(R.drawable.user_default)
-                    .data(user.profilePictureUrl)
+                    .data(if (savedMessage) R.drawable.saved_messages else user.profilePictureUrl)
                     .crossfade(true)
                     .crossfade(500)
                     .build(),
@@ -835,14 +866,16 @@ fun AppBarChat(
             )
             Column(modifier = Modifier.padding(start = 8.dp)) {
                 Text(
-                    text = user.getName(),
+                    text = if (savedMessage) stringResource(id = R.string.saved_messages) else user.getName(),
                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp)
                 )
-                Text(
-                    text = status?.getText(context) ?: stringResource(id = R.string.connecting),
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.alpha(0.7f)
-                )
+                if (savedMessage.not()){
+                    Text(
+                        text = status?.getText(context) ?: stringResource(id = R.string.connecting),
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.alpha(0.7f)
+                    )
+                }
             }
         }
     },
@@ -856,8 +889,49 @@ fun AppBarChat(
             IconButton(onClick = {}) {
                 Icon(imageVector = Icons.Rounded.Call, contentDescription = "call")
             }
-            IconButton(onClick = {}) {
-                Icon(imageVector = Icons.Rounded.MoreVert, contentDescription = "more")
+            Box {
+                IconButton(onClick = { expandMenu = true }) {
+                    Icon(imageVector = Icons.Rounded.MoreVert, contentDescription = "more")
+                }
+                DropdownMenu(expanded = expandMenu, onDismissRequest = { expandMenu = false }) {
+                    DropdownMenuItem(text = { Text(text = stringResource(id = R.string.delete_messages)) },
+                        onClick = {
+                            onEventListener.invoke(1)
+                            expandMenu = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                painter = painterResource(
+                                    R.drawable.outline_delete_sweep_24
+                                ),
+                                contentDescription = "delete messages"
+                            )
+                        })
+                    if (savedMessage.not()){
+                        DropdownMenuItem(text = { Text(text = stringResource(id = R.string.mark_as_read)) },
+                            onClick = {
+                                onEventListener.invoke(2)
+                                expandMenu = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.baseline_done_all_24),
+                                    contentDescription = "read"
+                                )
+                            })
+                    }
+                    DropdownMenuItem(text = { Text(text = stringResource(id = R.string.delete)) },
+                        onClick = {
+                            onEventListener.invoke(3)
+                            expandMenu = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Delete,
+                                contentDescription = "delete"
+                            )
+                        })
+                }
             }
         })
 }

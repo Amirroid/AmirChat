@@ -131,7 +131,7 @@ fun MediaPopUpWithAnimation(
     LaunchedEffect(key1 = pagerState.currentPage) {
         currentPosition = 0L
     }
-    MediaPopUp(show = show, size = size, offset = offset, mediaContent = { show ->
+    MediaPopUp(show = show, size = size, offset = offset, mediaContent = { showImage ->
         HorizontalPager(
             state = pagerState
         ) {
@@ -146,7 +146,7 @@ fun MediaPopUpWithAnimation(
             ) {
                 Zoomable {
                     MediaViewer(
-                        media, show, changeToPosition
+                        media, showImage, changeToPosition
                     ) { d, p, play ->
                         duration = d
                         currentPosition = p

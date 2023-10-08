@@ -233,4 +233,14 @@ class AuthManager @Inject constructor(
             )
         )
     }
+
+    suspend fun logOut() {
+        tokenHelper.logOut()
+    }
+
+    fun editUser(user: UserModel, onEnd: () -> Unit) {
+        userDatabase.document(user.token).set(user).addOnCompleteListener {
+            onEnd.invoke()
+        }
+    }
 }

@@ -89,19 +89,22 @@ fun MessagesList(
             reverseLayout = true,
             state = lazyState,
         ) {
-            items(messages.size) {
+            items(messages.size, key = {
+                messages[it].id
+            }) {
                 val message = messages[it]
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = tween(300)) + slideInVertically { 50 },
-                    exit = fadeOut(animationSpec = tween(300)) + slideOutVertically { 50 },
-                    initiallyVisible = animatedList.contains(message),
-                    modifier = Modifier.animateItemPlacement()
-                ) {
+//                AnimatedVisibility(
+//                    visible = true,
+//                    enter = fadeIn(animationSpec = tween(300)) + slideInVertically { 50 },
+//                    exit = fadeOut(animationSpec = tween(300)) + slideOutVertically { 50 },
+//                    initiallyVisible = animatedList.contains(message),
+//                    modifier = Modifier.animateItemPlacement()
+//                ) {
+                Box(modifier = Modifier.animateItemPlacement()) {
                     MessageView(
                         maxWidth,
                         message,
-                        message.from == CurrentUser.token,
+                        message.isMyMessage(),
                         replyEnabled,
                         playingMusic,
                         onMessageEvent = onMessageEvent,
@@ -118,6 +121,7 @@ fun MessagesList(
                 if (it != messages.size.minus(1)) {
                     Spacer(modifier = Modifier.height(12.dp))
                 }
+//                }
             }
         }
     }
