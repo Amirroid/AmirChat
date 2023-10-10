@@ -1029,7 +1029,6 @@ fun GalleryView(
                                 }
                                 val request =
                                     ImageRequest.Builder(context).data(files[index.plus(1)].path)
-                                        .diskCachePolicy(CachePolicy.ENABLED)
                                         .target { b -> bitmap2 = (b as BitmapDrawable).bitmap }
                                         .build()
                                 videoLoader.enqueue(request)

@@ -44,6 +44,7 @@ class RegisterViewModel
     var bio by mutableStateOf("")
 
     var loading by mutableStateOf(false)
+    var idChecking by mutableStateOf(false)
 
     private val intentFilter = IntentFilter(SmsRetriever.SMS_RETRIEVED_ACTION)
     private val smsReceiver = SMSBroadcastReceiver()
@@ -85,11 +86,15 @@ class RegisterViewModel
     @OptIn(FlowPreview::class)
     private fun checkId() = viewModelScope.launch(Dispatchers.IO) {
         id.debounce(500).collect {
+            idChecking = true
             authManager.checkIdExist(id.value) {
                 idExist = it
+                idChecking = false
             }
         }
     }
+
+    fun validateFields() = firstName.isNotEmpty() && lastName.isNotEmpty() && id.value.isNotEmpty()
 
     fun logIn(onComplete: () -> Unit) {
         loading = true

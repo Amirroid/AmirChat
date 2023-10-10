@@ -54,6 +54,7 @@ import ir.amirroid.amirchat.data.models.chat.MessageModel
 import ir.amirroid.amirchat.data.models.register.CurrentUser
 import ir.amirroid.amirchat.data.models.register.UserModel
 import ir.amirroid.amirchat.ui.features.chat.ChatScreen
+import ir.amirroid.amirchat.ui.features.contacts.ContactsScreen
 import ir.amirroid.amirchat.ui.features.forward.ForwardScreen
 import ir.amirroid.amirchat.ui.features.home.HomeScreen
 import ir.amirroid.amirchat.ui.features.profile.ProfileScreen
@@ -190,6 +191,9 @@ fun MainScreen(authManager: AuthManager) {
         }
         composable(ChatPages.SettingsScreen.route){
             SettingsScreen(navigation = navController)
+        }
+        composable(ChatPages.ContactsScreen.route){
+            ContactsScreen(navigation = navController)
         }
     }
 }

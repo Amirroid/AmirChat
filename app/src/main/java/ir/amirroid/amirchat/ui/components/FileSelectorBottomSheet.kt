@@ -98,6 +98,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -164,6 +165,7 @@ import ir.amirroid.amirchat.utils.toMediaJson
 import ir.amirroid.amirchat.viewmodels.ChatViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.count
@@ -242,14 +244,6 @@ fun FileSelectorBottomSheet(
                                 .animateContentSize(),
                             placeholder = {
                                 Text(text = stringResource(id = R.string.add_a_cation))
-                            },
-                            leadingIcon = {
-                                IconButton(onClick = {}) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.outline_insert_emoticon_24),
-                                        contentDescription = "emoji"
-                                    )
-                                }
                             })
                         Box(
                             modifier = Modifier
@@ -389,7 +383,28 @@ fun FileSelectorBottomSheet(
         }, label = "") {
             when (it) {
                 gallery -> {
-                    GalleyView(context, viewModel.medias, selectedItems)
+                    GalleyView(context, viewModel.medias, selectedItems) {
+                        caption = ""
+                        val type = getTypeForFile(currentType, context)
+                        val selectedItemsFilter =
+                            selectedItems.map { path ->
+                                val music =
+                                    viewModel.medias.value[viewModel.medias.value.indexOfFirst { data -> data.data == path }]
+                                val data = Gson().toJson(music.toMediaJson())
+                                FileMessage(
+                                    path,
+                                    path,
+                                    type,
+                                    data = data
+                                )
+                            }
+                        onSend.invoke(
+                            caption,
+                            selectedItemsFilter
+                        )
+                        onDismissRequest.invoke()
+                        selectedItems.clear()
+                    }
                 }
 
                 location -> {
@@ -887,7 +902,10 @@ fun TypeItemButton(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GalleyView(
-    context: Context, medias: StateFlow<List<MediaModel>>, selectedItems: SnapshotStateList<String>
+    context: Context,
+    medias: StateFlow<List<MediaModel>>,
+    selectedItems: SnapshotStateList<String>,
+    onSend: () -> Unit
 ) {
     val mediaState by medias.collectAsStateWithLifecycle(initialValue = emptyList())
     var showPopUpMedia by remember {
@@ -900,7 +918,7 @@ fun GalleyView(
         mutableStateOf(Offset.Zero)
     }
     var indexMediaShowed by remember {
-        mutableStateOf(1)
+        mutableIntStateOf(1)
     }
     val pagerState = rememberPagerState {
         mediaState.count()
@@ -924,7 +942,9 @@ fun GalleyView(
                     size = sizeClick
                     indexMediaShowed = index
                     showPopUpMedia = true
-                    scope.launch { pagerState.scrollToPage(index) }
+                    scope.launch {
+                        pagerState.scrollToPage(index)
+                    }
                 }) { select ->
                 if (select) {
                     selectedItems.add(media.data)
@@ -949,9 +969,18 @@ fun GalleyView(
             } else {
                 selectedItems.remove(media!!.data)
             }
-        }) {
-        scope.launch { pagerState.scrollToPage(indexMediaShowed) }
-        showPopUpMedia = false
+        }, onDismissRequest = {
+            scope.launch { pagerState.scrollToPage(indexMediaShowed) }
+            showPopUpMedia = false
+        }
+    ) {
+        if (selectedItems.isEmpty()) {
+            mediaState.getOrNull(pagerState.currentPage)?.let {
+                selectedItems.add(it.data)
+            }
+        }else{
+            onSend.invoke()
+        }
     }
 }
 

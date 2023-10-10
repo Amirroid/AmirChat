@@ -147,11 +147,12 @@ fun HomeScreen(
                     }
 
                     3 -> {
-                        viewModel.logOut()
-                        val intent = Intent(context, MainActivity::class.java)
-                        intent.flags =
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP.or(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        context.startActivity(intent)
+                        viewModel.logOut {
+                            val intent = Intent(context, MainActivity::class.java)
+                            intent.flags =
+                                Intent.FLAG_ACTIVITY_CLEAR_TOP.or(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                        }
                     }
                 }
                 scope.launch {
@@ -165,7 +166,9 @@ fun HomeScreen(
         Log.d("fsfsdfs", "HomeScreen: ${drawerState.offset.value}  --  $widthDrawer")
         Scaffold(
             floatingActionButton = {
-                FloatingActionButton(onClick = {}) {
+                FloatingActionButton(onClick = {
+                    navigation.navigate(ChatPages.ContactsScreen.route)
+                }) {
                     Icon(imageVector = Icons.Rounded.Edit, contentDescription = "edit")
                 }
             },

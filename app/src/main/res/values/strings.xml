@@ -60,4 +60,5 @@
     <string name="message_is_saved">Message is saved</string>
     <string name="log_out">Log out</string>
     <string name="wait_for_loading">Wait for loading</string>
+    <string name="please_fill_all_field">Please fill in all fields</string>
 </resources>

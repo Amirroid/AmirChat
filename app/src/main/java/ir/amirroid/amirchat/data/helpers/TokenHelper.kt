@@ -72,6 +72,7 @@ class TokenHelper @Inject constructor(
     }
 
     suspend fun logOut() {
+        CurrentUser.setUser(null)
         preferences.edit {
             it.remove(Keys.user)
         }

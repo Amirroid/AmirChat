@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 
@@ -82,8 +83,11 @@ class HomeViewModel @Inject constructor(
         chatRepository.setMyNotificationEnabled(enabled, room)
     }
 
-    fun logOut() = viewModelScope.launch(Dispatchers.IO) {
+    fun logOut(onEnd:()->Unit) = viewModelScope.launch(Dispatchers.IO) {
         tokenHelper.logOut()
+        withContext(Dispatchers.Main){
+            onEnd.invoke()
+        }
     }
 
     fun getSavedMessage(callback: (ChatRoom) -> Unit) {

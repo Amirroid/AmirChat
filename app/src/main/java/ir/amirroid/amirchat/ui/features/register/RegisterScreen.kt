@@ -17,6 +17,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -103,9 +104,6 @@ fun RegisterScreen(
     navigation: NavController
 ) {
     val viewModel: RegisterViewModel = hiltViewModel()
-    var syncContacts by remember {
-        mutableStateOf(true)
-    }
     val phoneNumber = viewModel.phoneNumber
     val verifyCode = viewModel.verifyCode
     val currentCode = viewModel.currentCode
@@ -201,27 +199,10 @@ fun RegisterScreen(
                             Column(modifier = Modifier.padding(top = 24.dp)) {
                                 AnimatedTextField(
                                     text = phoneNumber,
-                                    error = phoneNumber.checkMobile().not() && phoneNumber.length == 11
+                                    error = phoneNumber.checkMobile()
+                                        .not() && phoneNumber.length == 11
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                CheckboxText(
-                                    checked = syncContacts,
-                                    onCheckedChange = { check ->
-                                        syncContacts = check
-                                        scope.launch {
-                                            if (snackBarVisible) {
-                                                snackBarVisible = false
-                                                delay(300)
-                                            }
-                                            snackBarMessage =
-                                                context.getString(if (check) R.string.contacts_message else R.string.contacts_message_not)
-                                            snackBarVisible = true
-                                        }
-                                    },
-                                    text = stringResource(
-                                        id = R.string.sync_contacts,
-                                    ),
-                                )
                             }
                             Spacer(modifier = Modifier.weight(1f))
                             FloatingActionButton(
@@ -302,6 +283,7 @@ fun RegisterScreen(
                         val lastName = viewModel.lastName
                         val id by viewModel.id.collectAsStateWithLifecycle()
                         val bio = viewModel.bio
+                        val idChecking = viewModel.idChecking
                         val imagePicker =
                             rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { image ->
                                 if (image != null) {
@@ -317,29 +299,41 @@ fun RegisterScreen(
                                 .padding(horizontal = 12.dp)
                                 .verticalScroll(rememberScrollState())
                         ) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(context).data(imageProfile).crossfade(true)
-                                    .placeholder(R.drawable.round_image_24)
-                                    .error(R.drawable.round_image_24)
-                                    .crossfade(500)
-                                    .build(),
-                                contentDescription = null,
+                            AnimatedVisibility(visible = idChecking) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(36.dp),
+                                    strokeWidth = 3.dp,
+                                    strokeCap = StrokeCap.Round,
+                                )
+                            }
+                            Box(
                                 modifier = Modifier
                                     .clip(
                                         CircleShape
                                     )
                                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                     .size(108.dp)
-                                    .clickable {
-                                        imagePicker.launch("image/*")
-                                    }
-                                    .padding(if (imageProfile == Uri.EMPTY) 30.dp else 0.dp),
-                                colorFilter = if (imageProfile == Uri.EMPTY) ColorFilter.tint(
-                                    MaterialTheme.colorScheme.onBackground
-                                ) else null,
-                                contentScale = ContentScale.Crop,
-                                filterQuality = FilterQuality.High
-                            )
+                                    .padding(if (imageProfile?.path.isNullOrEmpty()) 18.dp else 0.dp)
+                            ) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context).data(imageProfile)
+                                        .crossfade(true)
+                                        .placeholder(R.drawable.round_image_24)
+                                        .error(R.drawable.round_image_24)
+                                        .crossfade(500)
+                                        .build(),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clickable {
+                                            imagePicker.launch("image/*")
+                                        },
+                                    colorFilter = if (imageProfile?.path.isNullOrEmpty()) ColorFilter.tint(
+                                        MaterialTheme.colorScheme.onBackground
+                                    ) else null,
+                                    contentScale = ContentScale.Crop,
+                                )
+                            }
                             OutlinedTextField(
                                 value = firstName,
                                 onValueChange = { value -> viewModel.firstName = value },
@@ -388,8 +382,24 @@ fun RegisterScreen(
                             )
                             Button(
                                 onClick = {
-                                    viewModel.logIn {
-                                        navigation.navigate(ChatPages.HomeScreen.route)
+                                    if (viewModel.validateFields()) {
+                                        if (idChecking) {
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(R.string.wait_for_loading),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        } else {
+                                            viewModel.logIn {
+                                                navigation.navigate(ChatPages.HomeScreen.route)
+                                            }
+                                        }
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.please_fill_all_field),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     }
                                 },
                                 modifier = Modifier
@@ -461,7 +471,7 @@ fun RegisterScreen(
                                 verifyCode.substring(0, verifyCode.length.minus(1))
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                     }
                 }
             }

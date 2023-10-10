@@ -1,8 +1,12 @@
 package ir.amirroid.amirchat.di
 
 import android.content.Context
+import coil.Coil
 import coil.ImageLoader
+import coil.disk.DiskCache
+import coil.imageLoader
 import coil.request.CachePolicy
+import coil.util.Logger
 import com.google.firebase.database.ktx.database
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
@@ -73,11 +77,11 @@ object NetModule {
     @Singleton
     fun provideImageLoader(
         @ApplicationContext context: Context
-    ) =
-        ImageLoader.Builder(context)
-            .respectCacheHeaders(false)
-            .allowHardware(true)
-            .memoryCachePolicy(CachePolicy.ENABLED)
-            .diskCachePolicy(CachePolicy.ENABLED)
-            .build()
+    ) = ImageLoader.Builder(context)
+        .respectCacheHeaders(false)
+        .allowHardware(true)
+        .memoryCachePolicy(CachePolicy.ENABLED)
+        .diskCachePolicy(CachePolicy.ENABLED)
+        .networkCachePolicy(CachePolicy.ENABLED)
+        .build()
 }

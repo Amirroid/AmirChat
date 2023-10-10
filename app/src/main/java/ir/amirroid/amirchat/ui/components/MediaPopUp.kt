@@ -41,6 +41,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -111,7 +112,8 @@ fun MediaPopUpWithAnimation(
     selected: Boolean,
     count: Int,
     onSelect: (Boolean) -> Unit,
-    onDismissRequest: () -> Unit
+    onDismissRequest: () -> Unit,
+    onSend: () -> Unit
 ) {
     var isPlayingVideo by remember {
         mutableStateOf(false)
@@ -121,9 +123,6 @@ fun MediaPopUpWithAnimation(
     }
     var duration by remember {
         mutableLongStateOf(0L)
-    }
-    var cation by remember {
-        mutableStateOf("")
     }
     var changeToPosition by remember {
         mutableLongStateOf(0L)
@@ -213,7 +212,7 @@ fun MediaPopUpWithAnimation(
                     )
                 }
             }
-            Column(modifier = Modifier.align(Alignment.BottomCenter)) {
+            Column(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
                 AnimatedVisibility(
                     media.getType().startsWith("video"),
                     enter = expandVertically(expandFrom = Alignment.Top),
@@ -228,41 +227,19 @@ fun MediaPopUpWithAnimation(
                         changeToPosition = it
                     }
                 }
-                Box(
-                    contentAlignment = Alignment.BottomCenter, modifier = Modifier
+                FloatingActionButton(
+                    onClick = onSend,
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp),
+                    modifier = Modifier
+                        .padding(bottom = 20.dp, end = 12.dp)
+                        .align(Alignment.End)
                 ) {
-                    TextField(value = cation,
-                        onValueChange = { value -> cation = value },
-                        colors = getBasicAlphaColorsOfTextField(),
-                        shape = RectangleShape,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateContentSize(),
-                        placeholder = {
-                            Text(text = stringResource(id = R.string.add_a_cation))
-                        },
-                        leadingIcon = {
-                            IconButton(onClick = {}) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.outline_insert_emoticon_24),
-                                    contentDescription = "emoji"
-                                )
-                            }
-                        })
-                    FloatingActionButton(
-                        onClick = {},
-                        shape = CircleShape,
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp),
-                        modifier = Modifier
-                            .padding(bottom = 20.dp, end = 12.dp)
-                            .align(Alignment.BottomEnd)
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.round_send_24),
-                            contentDescription = "send",
-                        )
-                    }
+                    Icon(
+                        painter = painterResource(id = R.drawable.round_send_24),
+                        contentDescription = "send",
+                    )
                 }
             }
         }
@@ -286,7 +263,7 @@ fun MediaViewer(
     LaunchedEffect(key1 = Unit) {
         if (image == null) {
             if (type.startsWith("video", true)) {
-                withContext(Dispatchers.Default) {
+                withContext(Dispatchers.IO) {
                     val bitmap = ThumbnailUtils.createVideoThumbnail(
                         media.data, MediaStore.Images.Thumbnails.MINI_KIND
                     )
@@ -309,10 +286,7 @@ fun MediaViewer(
         )
     } else {
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .allowHardware(true)
-                .data(image)
-                .build(),
+            model = image,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = if (show) ContentScale.Fit else ContentScale.Crop,
@@ -361,12 +335,12 @@ fun MediaPopUp(
     }
     LaunchedEffect(key1 = show) {
         launch {
-            if (show.not()) delay(300)
+            if (show.not()){
+                delay(100)
+                crop = show
+                delay(200)
+            }
             showPopUp = show
-        }
-        launch {
-            if (show.not()) delay(100)
-            crop = show
         }
         if (show) {
             delay(200)
@@ -392,7 +366,6 @@ fun MediaPopUp(
         MutableInteractionSource()
     }
     if (showPopUp) Popup(
-        properties = PopupProperties(focusable = true, dismissOnBackPress = true),
         onDismissRequest = onDismissRequest
     ) {
         Box {

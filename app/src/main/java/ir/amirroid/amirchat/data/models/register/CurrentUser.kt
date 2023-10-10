@@ -7,8 +7,8 @@ object CurrentUser {
         private set
 
 
-    fun setUser(user: UserModel) {
-        this.token = user.token
+    fun setUser(user: UserModel?) {
+        this.token = user?.token
         this.user = user
     }
 }

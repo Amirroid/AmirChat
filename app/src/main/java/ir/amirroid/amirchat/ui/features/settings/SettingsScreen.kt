@@ -11,6 +11,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -115,7 +116,7 @@ fun SettingsScreen(
                         }
 
                         2 -> {
-                            IconButton(onClick = { viewModel.editMode = false }) {
+                            IconButton(onClick = viewModel::cancelEditMode) {
                                 Icon(
                                     imageVector = Icons.Rounded.Close,
                                     contentDescription = null
@@ -126,11 +127,12 @@ fun SettingsScreen(
                         3 -> {
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 IconButton(onClick = {
-                                    viewModel.logOut()
-                                    val intent = Intent(context, MainActivity::class.java)
-                                    intent.flags =
-                                        Intent.FLAG_ACTIVITY_NEW_TASK.or(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                                    context.startActivity(intent)
+                                    viewModel.logOut {
+                                        val intent = Intent(context, MainActivity::class.java)
+                                        intent.flags =
+                                            Intent.FLAG_ACTIVITY_NEW_TASK.or(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                        context.startActivity(intent)
+                                    }
                                 }) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.ic_log_out),
@@ -155,29 +157,33 @@ fun SettingsScreen(
                 .padding(top = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            AsyncImage(
-                model = ImageRequest.Builder(context).data(imageProfile).crossfade(true)
-                    .placeholder(R.drawable.round_image_24)
-                    .error(R.drawable.round_image_24)
-                    .crossfade(500)
-                    .build(),
-                contentDescription = null,
+            Box(
                 modifier = Modifier
                     .clip(
                         CircleShape
                     )
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .size(108.dp)
-                    .clickable {
-                        imagePicker.launch("image/*")
-                    }
-                    .padding(if (imageProfile == null) 18.dp else 0.dp),
-                colorFilter = if (imageProfile == Uri.EMPTY) ColorFilter.tint(
-                    MaterialTheme.colorScheme.onBackground
-                ) else null,
-                contentScale = ContentScale.Crop,
-                filterQuality = FilterQuality.High
-            )
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context).data(imageProfile)
+                        .crossfade(true)
+                        .placeholder(R.drawable.user_default)
+                        .error(R.drawable.user_default)
+                        .crossfade(500)
+                        .build(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(enabled = editMode) {
+                            imagePicker.launch("image/*")
+                        },
+                    colorFilter = if (imageProfile?.path.isNullOrEmpty()) ColorFilter.tint(
+                        MaterialTheme.colorScheme.onBackground
+                    ) else null,
+                    contentScale = ContentScale.Crop,
+                )
+            }
             OutlinedTextField(
                 value = firstName,
                 onValueChange = { value -> viewModel.firstName = value },
@@ -234,30 +240,38 @@ fun SettingsScreen(
             AnimatedVisibility(visible = editMode) {
                 Button(
                     onClick = {
-                        if (loading) {
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.wait_for_loading),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        } else {
-                            if (viewModel.user?.profilePictureUrl?.toUri() == imageProfile) {
-                                viewModel.editUser {
-                                    navigation.navigate(ChatPages.HomeScreen.route){
+                        if (viewModel.validateFields()) {
+                            if (loading) {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.wait_for_loading),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                if (viewModel.user?.profilePictureUrl?.toUri() == imageProfile) {
+                                    viewModel.editUser {
+                                        navigation.navigate(ChatPages.HomeScreen.route) {
+                                            val intent = Intent(context, MainActivity::class.java)
+                                            intent.flags =
+                                                Intent.FLAG_ACTIVITY_NEW_TASK.or(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                            context.startActivity(intent)
+                                        }
+                                    }
+                                } else {
+                                    viewModel.logIn {
                                         val intent = Intent(context, MainActivity::class.java)
                                         intent.flags =
                                             Intent.FLAG_ACTIVITY_NEW_TASK.or(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                                         context.startActivity(intent)
                                     }
                                 }
-                            } else {
-                                viewModel.logIn {
-                                    val intent = Intent(context, MainActivity::class.java)
-                                    intent.flags =
-                                        Intent.FLAG_ACTIVITY_NEW_TASK.or(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                                    context.startActivity(intent)
-                                }
                             }
+                        } else {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.please_fill_all_field),
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     },
                     modifier = Modifier

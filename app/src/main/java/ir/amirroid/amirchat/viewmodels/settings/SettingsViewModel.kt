@@ -1,6 +1,7 @@
 package ir.amirroid.amirchat.viewmodels.settings
 
 import android.net.Uri
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,14 +13,15 @@ import ir.amirroid.amirchat.data.auth.AuthManager
 import ir.amirroid.amirchat.data.models.register.CurrentUser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import kotlin.math.log
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val authManager: AuthManager,
 ) : ViewModel() {
     var loading by mutableStateOf(false)
-    var editMode by mutableStateOf(false)
 
     var user = CurrentUser.user
 
@@ -31,10 +33,26 @@ class SettingsViewModel @Inject constructor(
 
     var idExists by mutableStateOf(false)
 
+    var editMode by mutableStateOf(false)
 
-    fun logOut() = viewModelScope.launch(Dispatchers.IO) {
-        authManager.logOut()
+    fun cancelEditMode() {
+        editMode = false
+        firstName = user?.firstName ?: ""
+        lastName = user?.lastName ?: ""
+        id = user?.userId ?: ""
+        bio = user?.bio ?: ""
+        image = user?.profilePictureUrl?.toUri()
     }
+
+
+    fun logOut(onEnd: () -> Unit) = viewModelScope.launch(Dispatchers.IO) {
+        authManager.logOut()
+        withContext(Dispatchers.Main) {
+            onEnd.invoke()
+        }
+    }
+
+    fun validateFields() = firstName.isNotEmpty() && lastName.isNotEmpty() && id.isNotEmpty()
 
     fun checkId() {
         if (id != user?.userId) {

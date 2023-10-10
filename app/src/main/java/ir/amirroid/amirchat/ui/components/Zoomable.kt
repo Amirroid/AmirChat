@@ -18,27 +18,5 @@ import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun Zoomable(content: @Composable () -> Unit) {
-    var zoom by remember {
-        mutableFloatStateOf(1f)
-    }
-    var rotation by remember {
-        mutableFloatStateOf(0f)
-    }
-    var offset by remember {
-        mutableStateOf(Offset.Zero)
-    }
-    val context = LocalContext.current
-    val displayMatrix = context.resources.displayMetrics
-    Box(
-        modifier = Modifier
-            .graphicsLayer {
-                rotationZ = rotation
-                scaleX = zoom
-                scaleY = zoom
-                translationX = offset.x
-                translationY = offset.y
-            }
-    ) {
-        content.invoke()
-    }
+    content.invoke()
 }
