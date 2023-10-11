@@ -112,7 +112,6 @@ fun ProfileScreen(navigation: NavController, user: UserModel) {
             val name = layout.findViewById<TextView>(R.id.name)
             val idText = layout.findViewById<TextView>(R.id.id_text)
 //            val bioTextView = layout.findViewById<TextView>(R.id.bio)
-            val call = layout.findViewById<ImageView>(R.id.call)
             val more = layout.findViewById<ImageView>(R.id.more)
 //            val qrCodeButton = layout.findViewById<ImageView>(R.id.qr_code)
 //            textInfo.setTextColor(primaryColor.toArgb())
@@ -130,7 +129,6 @@ fun ProfileScreen(navigation: NavController, user: UserModel) {
 //            qrCodeButton.setTint(iconColor.toArgb())
             backIcon.setOnClickListener { navigation.popBackStack() }
             more.setTint(iconColor.toArgb())
-            call.setTint(iconColor.toArgb())
             surface.setBackgroundColor(surfaceColor.toArgb())
             fab.setCardBackgroundColor(primaryColor.toArgb())
             fab.setOnClickListener {

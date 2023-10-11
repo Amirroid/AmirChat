@@ -105,10 +105,7 @@ fun MediaPopUpWithAnimation(
     show: Boolean,
     size: Size,
     offset: Offset,
-    mediaList: List<MediaModel>,
-    pagerState: PagerState = rememberPagerState {
-        mediaList.count()
-    },
+    media: MediaModel?,
     selected: Boolean,
     count: Int,
     onSelect: (Boolean) -> Unit,
@@ -127,123 +124,110 @@ fun MediaPopUpWithAnimation(
     var changeToPosition by remember {
         mutableLongStateOf(0L)
     }
-    LaunchedEffect(key1 = pagerState.currentPage) {
-        currentPosition = 0L
-    }
-    MediaPopUp(show = show, size = size, offset = offset, mediaContent = { showImage ->
-        HorizontalPager(
-            state = pagerState
-        ) {
-            val currentAlpha = pagerState.getOffsetFractionForPage(it).absoluteValue
-            val alpha = (1 - currentAlpha).coerceIn(0.6f, 1f)
-            val sizePresent = (1 - currentAlpha).coerceIn(0.9f, 1f)
-            val media = mediaList[it]
-            Box(
-                modifier = Modifier
-                    .fillMaxSize(sizePresent)
-                    .alpha(alpha)
-            ) {
-                Zoomable {
-                    MediaViewer(
-                        media, showImage, changeToPosition
-                    ) { d, p, play ->
-                        duration = d
-                        currentPosition = p
-                        isPlayingVideo = play
-                        Log.d("desjifcps", "MediaPopUpWithAnimation: $currentPosition")
-                    }
+    if (media != null)
+        MediaPopUp(show = show, size = size, offset = offset, mediaContent = { showImage ->
+            Zoomable {
+                MediaViewer(
+                    media, showImage, changeToPosition
+                ) { d, p, play ->
+                    duration = d
+                    currentPosition = p
+                    isPlayingVideo = play
+                    Log.d("desjifcps", "MediaPopUpWithAnimation: $currentPosition")
                 }
             }
-        }
-    }, onDismissRequest = onDismissRequest, overlyContent = {
-        val media = mediaList[pagerState.currentPage]
-        Box(modifier = Modifier.fillMaxSize()) {
-            CenterAlignedTopAppBar(title = {
-                Text(text = media.name, maxLines = 1)
-            }, navigationIcon = {
-                IconButton(onClick = onDismissRequest) {
-                    Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = "back")
-                }
-            }, colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                containerColor = Color.Black.copy(0.6f),
-                titleContentColor = Color.White,
-                navigationIconContentColor = Color.White
-            ), actions = {
-                Spacer(modifier = Modifier.width(6.dp))
-                AnimatedVisibility(visible = count != 0) {
+        }, onDismissRequest = onDismissRequest, overlyContent = {
+            Box(modifier = Modifier.fillMaxSize()) {
+                CenterAlignedTopAppBar(title = {
+                    Text(text = media.name, maxLines = 1)
+                }, navigationIcon = {
+                    IconButton(onClick = onDismissRequest) {
+                        Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = "back")
+                    }
+                }, colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.Black.copy(0.6f),
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White
+                ), actions = {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    AnimatedVisibility(visible = count != 0) {
+                        Box(
+                            modifier = Modifier
+                                .width(24.dp)
+                                .height(24.dp)
+                                .clip(CircleShape)
+                                .border(2.dp, Color.White, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = count.toString(),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    SelectionButton(
+                        checked = selected,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .toggleable(selected, onValueChange = onSelect)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                })
+                if (isPlayingVideo.not() && media.getType().startsWith("video")) {
                     Box(
                         modifier = Modifier
-                            .width(24.dp)
-                            .height(24.dp)
+                            .align(Alignment.Center)
                             .clip(CircleShape)
-                            .border(2.dp, Color.White, CircleShape),
+                            .background(Color.Black.copy(0.5f))
+                            .size(64.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = count.toString(),
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
+                        Icon(
+                            imageVector = Icons.Rounded.PlayArrow,
+                            contentDescription = "plaay",
+                            tint = Color.White
                         )
                     }
                 }
-                Spacer(modifier = Modifier.width(6.dp))
-                SelectionButton(
-                    checked = selected,
+                Column(
                     modifier = Modifier
-                        .size(32.dp)
-                        .toggleable(selected, onValueChange = onSelect)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-            })
-            if (isPlayingVideo.not() && media.getType().startsWith("video")) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(0.5f))
-                        .size(64.dp),
-                    contentAlignment = Alignment.Center
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.PlayArrow,
-                        contentDescription = "plaay",
-                        tint = Color.White
-                    )
-                }
-            }
-            Column(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-                AnimatedVisibility(
-                    media.getType().startsWith("video"),
-                    enter = expandVertically(expandFrom = Alignment.Top),
-                    exit = shrinkVertically(shrinkTowards = Alignment.Top),
-                    modifier = Modifier.padding(bottom = 12.dp)
-                ) {
-                    TrimMediaProgressBar(
-                        path = media.data,
-                        duration = media.duration,
-                        position = currentPosition,
+                    AnimatedVisibility(
+                        media.getType().startsWith("video"),
+                        enter = expandVertically(expandFrom = Alignment.Top),
+                        exit = shrinkVertically(shrinkTowards = Alignment.Top),
+                        modifier = Modifier.padding(bottom = 12.dp)
                     ) {
-                        changeToPosition = it
+                        TrimMediaProgressBar(
+                            path = media.data,
+                            duration = media.duration,
+                            position = currentPosition,
+                        ) {
+                            changeToPosition = it
+                        }
+                    }
+                    FloatingActionButton(
+                        onClick = onSend,
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp),
+                        modifier = Modifier
+                            .padding(bottom = 20.dp, end = 12.dp)
+                            .align(Alignment.End)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.round_send_24),
+                            contentDescription = "send",
+                        )
                     }
                 }
-                FloatingActionButton(
-                    onClick = onSend,
-                    shape = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp),
-                    modifier = Modifier
-                        .padding(bottom = 20.dp, end = 12.dp)
-                        .align(Alignment.End)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.round_send_24),
-                        contentDescription = "send",
-                    )
-                }
             }
-        }
-    })
+        })
 }
 
 @Composable
@@ -335,7 +319,7 @@ fun MediaPopUp(
     }
     LaunchedEffect(key1 = show) {
         launch {
-            if (show.not()){
+            if (show.not()) {
                 delay(100)
                 crop = show
                 delay(200)

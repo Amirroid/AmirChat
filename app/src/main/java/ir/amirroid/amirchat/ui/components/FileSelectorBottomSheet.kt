@@ -917,11 +917,8 @@ fun GalleyView(
     var offset by remember {
         mutableStateOf(Offset.Zero)
     }
-    var indexMediaShowed by remember {
-        mutableIntStateOf(1)
-    }
-    val pagerState = rememberPagerState {
-        mediaState.count()
+    var selectedMedia by remember {
+        mutableStateOf<MediaModel?>(null)
     }
     val scope = rememberCoroutineScope()
     LazyVerticalGrid(
@@ -940,11 +937,8 @@ fun GalleyView(
                 onClick = { offsetClick, sizeClick ->
                     offset = offsetClick
                     size = sizeClick
-                    indexMediaShowed = index
                     showPopUpMedia = true
-                    scope.launch {
-                        pagerState.scrollToPage(index)
-                    }
+                    selectedMedia = media
                 }) { select ->
                 if (select) {
                     selectedItems.add(media.data)
@@ -954,31 +948,28 @@ fun GalleyView(
             }
         }
     }
-    val media = mediaState.getOrNull(pagerState.currentPage)
-    val selected = selectedItems.contains(media?.data)
+    val selected = selectedItems.contains(selectedMedia?.data)
     MediaPopUpWithAnimation(show = showPopUpMedia,
         size = size,
         offset = offset,
-        mediaList = mediaState,
-        pagerState = pagerState,
-        selected,
-        selectedItems.count(),
+        selected = selected,
+        count = selectedItems.count(),
+        media = selectedMedia,
         onSelect = { select ->
             if (select) {
-                selectedItems.add(media!!.data)
+                selectedItems.add(selectedMedia!!.data)
             } else {
-                selectedItems.remove(media!!.data)
+                selectedItems.remove(selectedMedia!!.data)
             }
         }, onDismissRequest = {
-            scope.launch { pagerState.scrollToPage(indexMediaShowed) }
             showPopUpMedia = false
         }
     ) {
         if (selectedItems.isEmpty()) {
-            mediaState.getOrNull(pagerState.currentPage)?.let {
+            selectedMedia?.let {
                 selectedItems.add(it.data)
             }
-        }else{
+        } else {
             onSend.invoke()
         }
     }

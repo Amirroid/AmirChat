@@ -199,11 +199,6 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
         viewModel.observeToChats(room, user)
         onDispose { focusManager.clearFocus() }
     }
-    LaunchedEffect(key1 = messages.size) {
-        delay(200)
-        lazyState.animateScrollToItem(0)
-        hapticFeedback.startLongPress()
-    }
     val imeVisible = WindowInsets.isImeVisible
     LaunchedEffect(key1 = showEmojiKeyboard, key2 = imeVisible) {
         viewModel.setUserStatus(
@@ -364,7 +359,7 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
             }
         }, floatingActionButton = {
             AnimatedVisibility(
-                visible = lazyState.canScrollBackward,
+                visible = lazyState.canScrollForward,
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut(),
             ) {
@@ -376,7 +371,7 @@ fun ChatScreen(room: String?, user: UserModel, navigation: NavController) {
                             .fillMaxSize()
                             .clickable {
                                 scope.launch {
-                                    lazyState.animateScrollToItem(0)
+                                    lazyState.animateScrollToItem(messages.size)
                                 }
                             }, contentAlignment = Alignment.Center
                     ) {
@@ -886,9 +881,6 @@ fun AppBarChat(
         },
         colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = appBarColor),
         actions = {
-            IconButton(onClick = {}) {
-                Icon(imageVector = Icons.Rounded.Call, contentDescription = "call")
-            }
             Box {
                 IconButton(onClick = { expandMenu = true }) {
                     Icon(imageVector = Icons.Rounded.MoreVert, contentDescription = "more")

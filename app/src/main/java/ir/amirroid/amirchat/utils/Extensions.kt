@@ -59,6 +59,11 @@ fun Long.formatDateTime() =
 
 
 @SuppressLint("SimpleDateFormat")
+fun Long.formatDate() =
+    SimpleDateFormat("yyyy/MM/dd").format(this) ?: System.currentTimeMillis().toString()
+
+
+@SuppressLint("SimpleDateFormat")
 fun Long.formatDateTimeForFile() =
     SimpleDateFormat("yyyy-MM-dd-HH-ss").format(this) ?: this.toString()
 
