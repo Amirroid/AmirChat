@@ -329,6 +329,10 @@ fun MediaPopUp(
         if (show) {
             delay(200)
             launch {
+                delay(100)
+                crop = true
+            }
+            launch {
                 offsetAnimateX.snapTo(offset.x)
                 offsetAnimateY.snapTo(offset.y - statusBarHeight)
                 widthAnimation.snapTo(size.width)
@@ -336,7 +340,9 @@ fun MediaPopUp(
                 launch { offsetAnimateX.animateTo(0f) }
                 launch { offsetAnimateY.animateTo(0f) }
                 launch { widthAnimation.animateTo(width) }
-                launch { heightAnimation.animateTo(height) }
+                launch {
+                    heightAnimation.animateTo(height)
+                }
                 backgroundColor.snapTo(Color.Black)
             }
         } else {

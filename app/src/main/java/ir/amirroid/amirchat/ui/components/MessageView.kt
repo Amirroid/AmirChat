@@ -1018,32 +1018,6 @@ fun GalleryView(
                                 imageLoader.enqueue(request)
                             }
                         }
-                        LaunchedEffect(key1 = files[index.plus(1)].path) {
-                            if (files[index.plus(1)].path.getType().startsWith("video")) {
-                                if (message.from == CurrentUser.token) {
-                                    val request = ImageRequest.Builder(context)
-                                        .data(files[index.plus(1)].fromPath).target { b ->
-                                            bitmap2 = (b as BitmapDrawable).bitmap
-                                        }.build()
-                                    videoLoader.enqueue(request)
-                                }
-                                val request =
-                                    ImageRequest.Builder(context).data(files[index.plus(1)].path)
-                                        .target { b -> bitmap2 = (b as BitmapDrawable).bitmap }
-                                        .build()
-                                videoLoader.enqueue(request)
-                            } else {
-                                if (message.from == CurrentUser.token) {
-                                    bitmap2 =
-                                        BitmapFactory.decodeFile(files[index.plus(1)].fromPath)
-                                }
-                                val request =
-                                    ImageRequest.Builder(context).data(files[index.plus(1)].path)
-                                        .target { b -> bitmap2 = (b as BitmapDrawable).bitmap }
-                                        .build()
-                                imageLoader.enqueue(request)
-                            }
-                        }
                         Box(
                             contentAlignment = Alignment.Center, modifier = Modifier.weight(1f)
                         ) {
@@ -1087,6 +1061,32 @@ fun GalleryView(
                             }
                         }
                         if (files.size.minus(1) >= index.plus(1)) {
+                            LaunchedEffect(key1 = files[index.plus(1)].path) {
+                                if (files[index.plus(1)].path.getType().startsWith("video")) {
+                                    if (message.from == CurrentUser.token) {
+                                        val request = ImageRequest.Builder(context)
+                                            .data(files[index.plus(1)].fromPath).target { b ->
+                                                bitmap2 = (b as BitmapDrawable).bitmap
+                                            }.build()
+                                        videoLoader.enqueue(request)
+                                    }
+                                    val request =
+                                        ImageRequest.Builder(context).data(files[index.plus(1)].path)
+                                            .target { b -> bitmap2 = (b as BitmapDrawable).bitmap }
+                                            .build()
+                                    videoLoader.enqueue(request)
+                                } else {
+                                    if (message.from == CurrentUser.token) {
+                                        bitmap2 =
+                                            BitmapFactory.decodeFile(files[index.plus(1)].fromPath)
+                                    }
+                                    val request =
+                                        ImageRequest.Builder(context).data(files[index.plus(1)].path)
+                                            .target { b -> bitmap2 = (b as BitmapDrawable).bitmap }
+                                            .build()
+                                    imageLoader.enqueue(request)
+                                }
+                            }
                             var offset2 by remember {
                                 mutableStateOf(Offset.Zero)
                             }
